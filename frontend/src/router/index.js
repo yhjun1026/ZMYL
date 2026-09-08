@@ -91,8 +91,14 @@ const routes = [
 const router = createRouter({ history: createWebHistory(), routes })
 
 router.beforeEach((to) => {
-  if (to.path !== '/login' && !localStorage.getItem('med_token')) return '/login'
-  if (to.path === '/login' && localStorage.getItem('med_token')) return '/dashboard'
+  // token key 对齐到 zmyl_token（后端响应 + stores/auth.js）
+  const token = localStorage.getItem('zmyl_token') || localStorage.getItem('med_token');
+  if (token && !localStorage.getItem('zmyl_token')) {
+    localStorage.setItem('zmyl_token', token);
+    localStorage.removeItem('med_token');
+  }
+  if (to.path !== '/login' && !token) return '/login';
+  if (to.path === '/login' && localStorage.getItem('zmyl_token')) return '/dashboard';
 })
 
 export default router

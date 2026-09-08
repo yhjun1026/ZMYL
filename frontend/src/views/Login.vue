@@ -82,11 +82,11 @@ async function doLogin() {
   successMsg.value = ''
   loading.value = true
   try {
-    const data = await auth.login(username.value, password.value, remember.value)
-    const token = (data && (data.accessToken || data.access_token)) || ''
-    if (token) localStorage.setItem('med_token', token)
-    if (data && data.user) localStorage.setItem('med_name', data.user.username || data.user.name || username.value)
-    else localStorage.setItem('med_name', username.value)
+    const data = await auth.login(username.value, password.value)
+    const token = (data && data.token) || ''
+    if (token) localStorage.setItem('zmyl_token', token)
+    if (data && (data.username || data.name)) localStorage.setItem('zmyl_user_name', data.username || data.name)
+    else localStorage.setItem('zmyl_user_name', username.value)
     successMsg.value = '登录成功，正在进入系统...'
     await router.push('/dashboard')
   } catch (e) {

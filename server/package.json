@@ -1,0 +1,41 @@
+{
+  "name": "zmyl-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "卓盟医疗器械全生命周期管理平台 - Node.js 后端（P1 架构骨架）",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js",
+    "init-db": "node src/db/migrate.js up && node src/db/migrate.js seed",
+    "migrate": "node src/db/migrate.js up",
+    "seed": "node src/db/migrate.js seed",
+    "migrate:reset": "node src/db/migrate.js reset",
+    "migrate:status": "node src/db/migrate.js status",
+    "test": "jest --runInBand",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0",
+    "express": "^4.21.1",
+    "cors": "^2.8.5",
+    "morgan": "^1.10.0",
+    "jsonwebtoken": "^9.0.2",
+    "bcryptjs": "^2.4.3",
+    "joi": "^17.13.3",
+    "multer": "^1.4.5-lts.1",
+    "winston": "^3.15.0",
+    "xss": "^1.0.15",
+    "express-rate-limit": "^7.4.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "nodemon": "^3.1.7",
+    "prettier": "^3.3.3",
+    "supertest": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

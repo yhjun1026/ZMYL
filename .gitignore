@@ -56,7 +56,18 @@ Desktop.ini
 .env
 .env.local
 .env.*.local
+server/.env
+
+# ===== WorkBuddy =====
+.workbuddy/
 
 # ===== Build artifacts =====
 frontend/dist/
 *.tsbuildinfo
+
+# ===== Server runtime =====
+server/data/*.db
+server/data/*.db-*
+server/logs/*.log
+server/uploads/*
+!server/uploads/.gitkeep

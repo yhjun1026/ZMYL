@@ -1,0 +1,71 @@
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+const path = require('path');
+
+const config = require('./config');
+const logger = require('./utils/logger');
+const securityHeaders = require('./middleware/security');
+const { globalLimiter } = require('./middleware/rateLimit');
+const authMiddleware = require('./middleware/auth');
+const { errorHandler, notFound } = require('./middleware/error');
+const routes = require('./routes');
+
+// 白名单：不需要鉴权
+const WHITELIST = ['/health', '/auth/login'];
+
+function buildApp() {
+  const app = express();
+
+  // 1. 反代信任
+  app.set('trust proxy', 1);
+  app.disable('x-powered-by');
+
+  // 2. body parser
+  app.use(express.json({ limit: '1mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+  // 3. 访问日志（跳过 /api/health）
+  app.use(morgan(config.isProd ? 'combined' : 'dev', {
+    skip: (req) => req.originalUrl === '/api/health',
+    stream: { write: (msg) => logger.info(msg.trim()) },
+  }));
+
+  // 4. CORS
+  app.use(cors({
+    origin: (origin, cb) => {
+      // 同源 / 无 origin（curl 等）放行
+      if (!origin) return cb(null, true);
+      if (config.cors.origins.includes(origin) || config.cors.origins.includes('*')) {
+        return cb(null, true);
+      }
+      return cb(new Error(`CORS blocked: ${origin}`));
+    },
+    credentials: true,
+  }));
+
+  // 5. 安全头
+  app.use(securityHeaders);
+
+  // 6. 全局限速
+  app.use(globalLimiter);
+
+  // 7. 业务路由（统一鉴权：除白名单外都强制 JWT）
+  app.use('/api', (req, res, next) => {
+    if (WHITELIST.includes(req.path) || WHITELIST.includes(req.originalUrl.replace('/api', ''))) {
+      return next();
+    }
+    return authMiddleware(req, res, next);
+  }, routes);
+
+  // 8. 静态资源（uploads）
+  app.use('/uploads', express.static(config.upload.dir));
+
+  // 9. 404 + 错误处理
+  app.use(notFound);
+  app.use(errorHandler);
+
+  return app;
+}
+
+module.exports = buildApp();
