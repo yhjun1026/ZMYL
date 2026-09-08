@@ -9,6 +9,7 @@ const db = require('../db');
 const { success, fail } = require('../utils/response');
 const auditLog = require('../utils/audit');
 const { MODULES } = require('../config/modules');
+const outbound = require('./outbound.controller'); // 出库单 CRUD 钩子（库存预占等）
 
 // ---- 表元数据缓存: table -> { columns:Set, hasDeleted, hasWorkflowStatus } ----
 const metaCache = new Map();
@@ -122,6 +123,15 @@ async function create(req, res) {
     data.deleted = 0;
   }
 
+  // 出库单默认值：单号 / 六级流起点 / 日期（P3）
+  if (table === 'outbound_record') {
+    if (!data.status) data.status = '待销售经理审核';
+    if (!data.order_no) data.order_no = `SO-${nowStr().replace(/[-: ]/g, '').slice(0, 14)}`;
+    if (!data.date) data.date = nowStr().slice(0, 10);
+    if (!data.qty) data.qty = 1;
+    if (!data.unit) data.unit = '台';
+  }
+
   const cols = Object.keys(data);
   const sql = `INSERT INTO "${table}" (${cols.map((c) => `"${c}"`).join(', ')})
                VALUES (${cols.map(() => '?').join(', ')})`;
@@ -130,7 +140,20 @@ async function create(req, res) {
   auditLog('CRUD_CREATE', req.userId, `${table}#${info.insertId}`, { table });
 
   const row = await db.get(`SELECT * FROM "${table}" WHERE id = ?`, [info.insertId]);
-  return res.json(success(row, '新增成功'));
+
+  // 出库单：创建后尝试预占库存（不足则提示但保留单据）
+  let extra = {};
+  if (table === 'outbound_record') {
+    try { extra = await outbound.hookAfterCreate(req, row) || {}; } catch { extra = {}; }
+  }
+
+  // 钩子可能已更新记录（预占信息），重新取行保证响应新鲜
+  const fresh = table === 'outbound_record'
+    ? await db.get(`SELECT * FROM "${table}" WHERE id = ?`, [info.insertId])
+    : row;
+  return res.json(success(fresh, extra.warning
+    ? `新增成功（注意：${extra.warning}）`
+    : (extra.reserved ? `新增成功（${extra.reserved}）` : '新增成功')));
 }
 
 /**
@@ -148,6 +171,19 @@ async function update(req, res) {
   if (Object.keys(data).length === 0) {
     return res.json(fail('没有要修改的字段'));
   }
+
+  // 出库单：编辑保护（仅待销售经理审核/已驳回可改 + 剥离审批与库存联动字段）
+  let beforeStatus = null;
+  if (table === 'outbound_record') {
+    const cur = await db.get(`SELECT * FROM "${table}" WHERE id = ?`, [id]);
+    const err = outbound.hookBeforeUpdate(req, cur, data);
+    if (err) return res.status(403).json(fail(err, 403));
+    beforeStatus = cur.status;
+    if (Object.keys(data).length === 0) {
+      return res.json(fail('没有要修改的字段（审批中单据内容不可修改）'));
+    }
+  }
+
   if (meta.columns.has('updated_by')) {
     data.updated_by = req.user.username;
   }
@@ -162,7 +198,18 @@ async function update(req, res) {
   auditLog('CRUD_UPDATE', req.userId, `${table}#${id}`, { table });
 
   const row = await db.get(`SELECT * FROM "${table}" WHERE id = ?`, [id]);
-  return res.json(success(row, '更新成功'));
+
+  // 出库单：驳回重提（重新预占 + 状态回起点）
+  let extra = {};
+  if (table === 'outbound_record') {
+    try { extra = await outbound.hookAfterUpdate(req, row, beforeStatus) || {}; } catch { extra = {}; }
+  }
+
+  return res.json(success(
+    await db.get(`SELECT * FROM "${table}" WHERE id = ?`, [id]),
+    extra.warning ? `更新成功（注意：${extra.warning}）`
+      : (extra.reserved ? `更新成功（${extra.reserved}）` : '更新成功')
+  ));
 }
 
 /**

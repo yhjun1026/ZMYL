@@ -11,7 +11,10 @@ const db = require('../db');
 async function authMiddleware(req, res, next) {
   try {
     const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+    // 支持 Authorization: Bearer <token> 与 ?token=<token>（浏览器直接打开 PDF/下载链接无法带 header）
+    const token = authHeader.startsWith('Bearer ')
+      ? authHeader.slice(7)
+      : (req.query && req.query.token) || '';
     const decoded = verifyToken(token);
 
     if (!decoded) {

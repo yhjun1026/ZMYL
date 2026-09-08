@@ -80,6 +80,49 @@ export const workflow = {
   // 采购入库五步流: 待验收->待质管审核->待库管确认->待负责人批准->已入库
   procFlow: (resource, id, step, action) =>
     http.post('/api/' + resource + '/' + id + '/' + step, { action }),
+  // 销售出库六级流（P3）: 待销售经理审核->质管员->库管员->质量负责人->销售总监->已出库
+  outboundFlow: (id, action, opinion) =>
+    http.post('/api/outbound_record/' + id + '/flow', { action, opinion }),
+  outboundPrint: (id) => http.post('/api/outbound_record/' + id + '/print', {}),
+  // 产品验收五步流（P3）: 待验收->外观检查->数量核对->质量检验->综合判定
+  paStep: (id, payload) => http.post('/api/product_acceptance/' + id + '/workflow-step', payload),
+  paReset: (id) => http.post('/api/product_acceptance/' + id + '/workflow-reset', {}),
+}
+
+// ===== 审批通知收件箱（P3） =====
+export const notification = {
+  list: () => http.get('/api/notifications'),
+  unreadCount: () => http.get('/api/notifications/unread-count'),
+  markRead: (id) => http.put('/api/notifications/' + id + '/read'),
+  markAllRead: () => http.put('/api/notifications/read-all'),
+}
+
+// ===== 报表中心（P3） =====
+export const report = {
+  listTypes: () => http.get('/api/reports'),
+  summary: () => http.get('/api/reports/summary'),
+  // 导出 Excel（blob 触发浏览器下载）
+  async exportFile(type) {
+    const blob = await http.get('/api/reports/export/' + type, { responseType: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${type}_${new Date().toISOString().slice(0, 10)}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  },
+}
+
+// ===== 验收资料 PDF（P3） =====
+export const fileApi = {
+  uploadDoc: (formData) =>
+    http.post('/api/acceptance_doc', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  listDocs: (params) => http.get('/api/acceptance_doc', { params }),
+  removeDoc: (id) => http.delete('/api/acceptance_doc/' + id),
+  // 浏览器直接打开（iframe/新窗口用，token 走查询参数）
+  docUrl: (id) => `/api/acceptance_doc/${id}/file?token=${encodeURIComponent(localStorage.getItem(TOKEN_KEY) || '')}`,
 }
 
 export default http

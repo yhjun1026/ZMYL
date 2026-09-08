@@ -17,33 +17,46 @@ const asyncHandler = require('../utils/asyncHandler');
 const auth = require('../middleware/auth');
 const crud = require('../controllers/crud.controller');
 const wf = require('../controllers/workflow.controller');
+const outbound = require('../controllers/outbound.controller');
+const pa = require('../controllers/acceptance.controller');
+const fileCtl = require('../controllers/file.controller');
 const { MODULES, WORKFLOW } = require('../config/modules');
 
 router.use(auth);
 
-// ---- 通用 CRUD ----
-for (const table of Object.keys(MODULES)) {
-  router.get(`/${table}`, asyncHandler(crud.list));
-  router.get(`/${table}/:id(\\d+)`, asyncHandler(crud.getOne));
-  router.post(`/${table}`, asyncHandler(crud.create));
-  router.put(`/${table}/:id(\\d+)`, asyncHandler(crud.update));
-  router.delete(`/${table}/:id(\\d+)`, asyncHandler(crud.remove));
-}
+// ---- P3 专用路由（先于通用 CRUD 注册，避免被泛路由吞掉） ----
 
-// ---- 两级审批（8 张档案表 + 证照变更申请）----
-for (const table of [...WORKFLOW.TWO_LEVEL, 'cert_update_request']) {
-  router.put(`/${table}/:id(\\d+)/review`, asyncHandler(wf.review));
-  router.put(`/${table}/:id(\\d+)/approve`, asyncHandler(wf.approve));
-}
+// 销售出库六级审批 + 打印留痕
+router.post('/outbound_record/:id(\\d+)/flow', asyncHandler(outbound.outboundFlow));
+router.post('/outbound_record/:id(\\d+)/print', asyncHandler(outbound.printStamp));
+
+// 产品验收五步流 + 重置 + 效期统计
+router.post('/product_acceptance/:id(\\d+)/workflow-step', asyncHandler(pa.paStep));
+router.post('/product_acceptance/:id(\\d+)/workflow-reset', asyncHandler(pa.paReset));
+router.get('/product_acceptance/expiry-stats', asyncHandler(pa.paExpiryStats));
+
+// 验收资料 PDF 上传/下载（multer multipart）
+router.post('/acceptance_doc', fileCtl.upload.single('file'), asyncHandler(fileCtl.uploadDoc));
+router.get('/acceptance_doc/:id(\\d+)/file', asyncHandler(fileCtl.downloadDoc));
+router.delete('/acceptance_doc/:id(\\d+)', asyncHandler(fileCtl.removeDoc));
+
+// ---- 通用 CRUD（参数化路由，controller 从 req.params.table 取表名） ----
+router.get('/:table', asyncHandler(crud.list));
+router.get('/:table/:id(\\d+)', asyncHandler(crud.getOne));
+router.post('/:table', asyncHandler(crud.create));
+router.put('/:table/:id(\\d+)', asyncHandler(crud.update));
+router.delete('/:table/:id(\\d+)', asyncHandler(crud.remove));
+
+// ---- 两级审批（参数化路由；controller 内部校验表是否支持审批流） ----
+router.put('/:table/:id(\\d+)/review', asyncHandler(wf.review));
+router.put('/:table/:id(\\d+)/approve', asyncHandler(wf.approve));
 
 // ---- 采购计划：单级审批 + 转采购执行单 ----
 router.post('/purchase_plan/:id(\\d+)/review', asyncHandler(wf.reviewPlan));
 router.post('/purchase_plan/:id(\\d+)/convert-to-procurement', asyncHandler(wf.convertPlan));
 
-// ---- 采购入库五步流 ----
+// ---- 采购入库五步流（controller 内部校验 WORKFLOW.PROC） ----
 const PROC_ACTIONS = wf.PROC_STEPS.map((s) => s.action).join('|');
-for (const table of WORKFLOW.PROC) {
-  router.post(`/${table}/:id(\\d+)/:step(${PROC_ACTIONS})`, asyncHandler(wf.procFlow));
-}
+router.post(`/:table/:id(\\d+)/:step(${PROC_ACTIONS})`, asyncHandler(wf.procFlow));
 
 module.exports = router;

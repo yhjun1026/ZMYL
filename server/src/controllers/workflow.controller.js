@@ -45,7 +45,7 @@ function displayName(req) {
  * body: { action: 'approve' | 'reject', opinion }
  */
 async function review(req, res) {
-  const { resource, id } = req.params;
+  const { table: resource, id } = req.params;
   if (!WORKFLOW.TWO_LEVEL.includes(resource) && resource !== 'cert_update_request') {
     return res.status(404).json(fail('该模块不支持审核流', 404));
   }
@@ -79,7 +79,7 @@ async function review(req, res) {
  * body: { action: 'approve' | 'reject', opinion }
  */
 async function approve(req, res) {
-  const { resource, id } = req.params;
+  const { table: resource, id } = req.params;
   if (!WORKFLOW.TWO_LEVEL.includes(resource) && resource !== 'cert_update_request') {
     return res.status(404).json(fail('该模块不支持审批流', 404));
   }
@@ -205,7 +205,7 @@ const PROC_STEPS = [
  * body: { action: 'approve' | 'reject', opinion? }
  */
 async function procFlow(req, res) {
-  const { resource, id, step: action } = req.params;
+  const { table: resource, id, step: action } = req.params;
   if (!WORKFLOW.PROC.includes(resource)) {
     return res.status(404).json(fail('不支持的操作', 404));
   }

@@ -3,6 +3,7 @@ import Login from '../views/Login.vue'
 import MainLayout from '../views/MainLayout.vue'
 import Dashboard from '../views/Dashboard.vue'
 import ModulePage from '../views/ModulePage.vue'
+import Report from '../views/Report.vue'
 
 // 原版菜单一比一还原（menu.js 的 menuItems）
 export const menuItems = [
@@ -82,6 +83,7 @@ const routes = [
     redirect: '/dashboard',
     children: [
       { path: 'dashboard', component: Dashboard, meta: { title: '智能工作台' } },
+      { path: 'report', component: Report, meta: { title: '综合统计报表' } },
       { path: 'module/:id', component: ModulePage },
     ]
   },

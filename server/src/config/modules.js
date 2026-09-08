@@ -42,11 +42,12 @@ const MODULES = {
   operation_log:       { title: '操作日志',     searchFields: ['user', 'text'] },
   data_bridge_log:     { title: '数据桥接日志', searchFields: ['bridge_type', 'source_module'] },
   approval_notification: { title: '审批通知',   searchFields: ['title', 'module', 'target_user'] },
+  acceptance_doc:        { title: '验收资料',   searchFields: ['title', 'file_name', 'order_no'] }, // P3：PDF 留档
   outbound_template:   { title: '出库模板',     searchFields: ['name', 'description'] },
   system_profile:      { title: '系统配置',     searchFields: ['name'] },
 };
 
-// 工作流模式（与前端 ModulePage.vue WF_TWO/WF_PLAN/WF_PROC 对齐）
+// 工作流模式（与前端 ModulePage.vue WF_* 常量对齐）
 const WORKFLOW = {
   // 两级审批：待审核 -> 已审核 -> 已批准/已驳回
   TWO_LEVEL: [
@@ -57,6 +58,10 @@ const WORKFLOW = {
   PLAN: ['purchase_plan'],
   // 采购入库五步流：待验收 -> 待质管审核 -> 待库管确认 -> 待负责人批准 -> 已入库
   PROC: ['proc_equipment', 'proc_consumable'],
+  // P3 销售出库六级流：待销售经理审核 -> 待质管员 -> 待库管员 -> 待质量负责人 -> 待销售总监 -> 已出库
+  OUTBOUND: ['outbound_record'],
+  // P3 产品验收五步流：待验收 -> 外观检查完成 -> 数量核对完成 -> 质量检验完成 -> 已完成
+  PA: ['product_acceptance'],
 };
 
 module.exports = { MODULES, WORKFLOW };
