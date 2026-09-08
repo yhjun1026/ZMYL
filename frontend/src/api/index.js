@@ -125,4 +125,88 @@ export const fileApi = {
   docUrl: (id) => `/api/acceptance_doc/${id}/file?token=${encodeURIComponent(localStorage.getItem(TOKEN_KEY) || '')}`,
 }
 
+// ===== 可配置审批流（P4） =====
+export const flowApi = {
+  meta: () => http.get('/api/approval-flows/meta'),
+  list: (params) => http.get('/api/approval-flows', { params }),
+  get: (id) => http.get('/api/approval-flows/' + id),
+  create: (data) => http.post('/api/approval-flows', data),
+  update: (id, data) => http.put('/api/approval-flows/' + id, data),
+  remove: (id) => http.delete('/api/approval-flows/' + id),
+  submit: (id) => http.post('/api/approval-flows/' + id + '/submit', {}),
+  approve: (id, action, opinion) => http.post('/api/approval-flows/' + id + '/approve', { action, opinion }),
+  disable: (id) => http.post('/api/approval-flows/' + id + '/disable', {}),
+  newVersion: (id) => http.post('/api/approval-flows/' + id + '/new-version', {}),
+  active: () => http.get('/api/approval-flows/active'),
+  versions: (id) => http.get('/api/approval-flows/' + id + '/versions'),
+  logs: (id) => http.get('/api/approval-flows/' + id + '/logs'),
+  hooks: () => http.get('/api/approval-flows/hooks'),
+}
+
+// ===== 冷链管理（P4） =====
+export const coldChain = {
+  dashboard: () => http.get('/api/cold-chain/dashboard'),
+  chainTrace: (params) => http.get('/api/cold-chain/chain-trace', { params }),
+  listDevices: (params) => http.get('/api/cold-chain/devices', { params }),
+  createDevice: (data) => http.post('/api/cold-chain/devices', data),
+  updateDevice: (id, data) => http.put('/api/cold-chain/devices/' + id, data),
+  removeDevice: (id) => http.delete('/api/cold-chain/devices/' + id),
+  listRecords: (params) => http.get('/api/cold-chain/records', { params }),
+  createRecord: (data) => http.post('/api/cold-chain/records', data),
+  batchRecords: (data) => http.post('/api/cold-chain/records/batch', data),
+  listAlarms: (params) => http.get('/api/cold-chain/alarms', { params }),
+  alarmStats: () => http.get('/api/cold-chain/alarms/stats'),
+  handleAlarm: (id, data) => http.post('/api/cold-chain/alarms/' + id + '/handle', data),
+  scanOffline: () => http.post('/api/cold-chain/alarms/scan-offline', {}),
+  listLedgers: () => http.get('/api/cold-chain/ledgers'),
+  getLedger: (id) => http.get('/api/cold-chain/ledgers/' + id),
+  generateLedger: (data) => http.post('/api/cold-chain/ledgers/generate', data),
+  verifyLedger: (id) => http.post('/api/cold-chain/ledgers/' + id + '/verify', {}),
+}
+
+// ===== 物流追踪（P4） =====
+export const logistics = {
+  dashboard: () => http.get('/api/logistics/dashboard'),
+  trace: (logisticsNo) => http.get('/api/logistics/trace', { params: { logistics_no: logisticsNo } }),
+  listCarriers: () => http.get('/api/logistics/carriers'),
+  createCarrier: (data) => http.post('/api/logistics/carriers', data),
+  updateCarrier: (id, data) => http.put('/api/logistics/carriers/' + id, data),
+  removeCarrier: (id) => http.delete('/api/logistics/carriers/' + id),
+  listOrders: (params) => http.get('/api/logistics/orders', { params }),
+  createOrder: (data) => http.post('/api/logistics/orders', data),
+  getOrder: (id) => http.get('/api/logistics/orders/' + id),
+  updateOrder: (id, data) => http.put('/api/logistics/orders/' + id, data),
+  removeOrder: (id) => http.delete('/api/logistics/orders/' + id),
+  addNode: (id, data) => http.post('/api/logistics/orders/' + id + '/nodes', data),
+  removeNode: (id, nid) => http.delete('/api/logistics/orders/' + id + '/nodes/' + nid),
+  markException: (id, remark) => http.post('/api/logistics/orders/' + id + '/exception', { remark }),
+}
+
+// ===== 数据互联互通（P4） =====
+export const bridgeApi = {
+  pendingApprovals: () => http.get('/api/bridge/pending-approvals'),
+  dataFlowSummary: () => http.get('/api/bridge/data-flow-summary'),
+  inventoryOptions: () => http.get('/api/bridge/inventory-options'),
+  supplierOptions: () => http.get('/api/bridge/supplier-options'),
+  customerOptions: () => http.get('/api/bridge/customer-options'),
+}
+
+// ===== 数据备份（P4） =====
+export const backupApi = {
+  list: () => http.get('/api/backup'),
+  run: () => http.post('/api/backup/run', {}),
+  remove: (id) => http.delete('/api/backup/' + id),
+  async downloadFile(id, fileName) {
+    const blob = await http.get('/api/backup/' + id + '/download', { responseType: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName || `backup_${id}.db`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  },
+}
+
 export default http

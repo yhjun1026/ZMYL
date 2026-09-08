@@ -46,6 +46,12 @@ const config = {
   },
 
   autoSeed: process.env.AUTO_SEED !== '0',
+
+  // P4 自动备份（BACKUP_INTERVAL_HOURS=0 关闭）
+  backup: {
+    intervalHours: parseFloat(process.env.BACKUP_INTERVAL_HOURS || '24'),
+    keep: parseInt(process.env.BACKUP_KEEP || '10', 10),
+  },
 };
 
 if (config.isProd && config.jwt.secret === 'change-me-in-production') {

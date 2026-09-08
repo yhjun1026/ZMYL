@@ -12,8 +12,8 @@ const authMiddleware = require('./middleware/auth');
 const { errorHandler, notFound } = require('./middleware/error');
 const routes = require('./routes');
 
-// 白名单：不需要鉴权
-const WHITELIST = ['/health', '/auth/login'];
+// 白名单：不需要鉴权（IoT 上报走 api_key 认证，见 coldchain.controller）
+const WHITELIST = ['/health', '/auth/login', '/cold-chain/iot/report', '/cold-chain/iot/batch-report'];
 
 function buildApp() {
   const app = express();

@@ -6,4 +6,5 @@ module.exports = [
   require('./001_init_users_roles'),
   require('./002_business_tables'),
   require('./003_p3_features'),
+  require('./004_p4_features'),
 ];

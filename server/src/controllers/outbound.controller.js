@@ -8,6 +8,13 @@ const db = require('../db');
 const { success, fail } = require('../utils/response');
 const auditLog = require('../utils/audit');
 const { pushNotification } = require('../utils/notify');
+const { flowGuard } = require('../utils/flowEngine');
+const { logBridge } = require('../utils/bridge');
+
+// 出库审批状态 -> 审批流步骤序号（可配置流程 biz_module=outbound 时按此换算）
+const OUTBOUND_STATUS_STEP = {
+  '待销售经理审核': 1, '待质管员审核': 2, '待库管员审核': 3, '待质量负责人审核': 4, '待销售总监审核': 5,
+};
 
 // 六级流：状态 -> 下一状态
 const OUTBOUND_FLOW = ['待销售经理审核', '待质管员审核', '待库管员审核', '待质量负责人审核', '待销售总监审核', '已出库'];
@@ -125,7 +132,7 @@ async function deductStock(ob, operator) {
   return { ok: true, inv };
 }
 
-/** 财务自动记账（收入） */
+/** 财务自动记账（收入）+ 数据桥接留痕 */
 async function autoFinanceIncome(orderNo, amount, customer, note) {
   try {
     await db.run(
@@ -133,6 +140,8 @@ async function autoFinanceIncome(orderNo, amount, customer, note) {
        VALUES ('收入', '销售出库', ?, ?, ?, '销售部', '', ?, ?, 0)`,
       [amount, nowFull().slice(0, 10), orderNo, note, nowFull()]
     );
+    await logBridge('出库转财务', '销售出库', orderNo, '财务管理', '',
+      `出库单${orderNo}自动生成财务收入记录${amount}元`);
   } catch { /* finance_record 列不齐时忽略 */ }
 }
 
@@ -159,7 +168,14 @@ async function outboundFlow(req, res) {
     return res.status(400).json(fail(`当前状态「${oldStatus}」不在审批环节中，无法审批`, 400));
   }
   const stepRole = OUTBOUND_STEP_ROLE[oldStatus];
-  if (role !== stepRole && role !== 'sys_admin') {
+  // 可配置审批流优先：outbound 模块有生效流程时按当前环节步骤配置校验
+  const flowErr = await flowGuard('outbound', OUTBOUND_STATUS_STEP[oldStatus], req, action);
+  if (flowErr) {
+    return res.status(flowErr.status).json(fail(flowErr.message, flowErr.status));
+  }
+  const { getActiveFlow } = require('../utils/flowEngine');
+  const flowApplied = !!(await getActiveFlow('outbound'));
+  if (!flowApplied && role !== stepRole && role !== 'sys_admin') {
     return res.status(403).json(
       fail(`本环节须由${OUTBOUND_STEP_LABEL[oldStatus]}对应角色（${stepRole}）执行，当前角色无权操作`, 403)
     );

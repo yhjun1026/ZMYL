@@ -4,6 +4,10 @@ import MainLayout from '../views/MainLayout.vue'
 import Dashboard from '../views/Dashboard.vue'
 import ModulePage from '../views/ModulePage.vue'
 import Report from '../views/Report.vue'
+import FlowConfig from '../views/FlowConfig.vue'
+import ColdChain from '../views/ColdChain.vue'
+import Logistics from '../views/Logistics.vue'
+import Backup from '../views/Backup.vue'
 
 // 原版菜单一比一还原（menu.js 的 menuItems）
 export const menuItems = [
@@ -39,6 +43,11 @@ export const menuItems = [
   { id:'system-profile', label:'经营企业资质档案', icon:'🏢', gsp:'GSP第8-10条' },
   { id:'finance', label:'财务经营统计', icon:'💰' },
   { id:'report', label:'综合统计报表', icon:'📈' },
+  { id:'sep-p4', label:'-- 高级特性 --', sep:true, group:'高级特性' },
+  { id:'flow-config', label:'审批流程配置', icon:'🔀', gsp:'GSP质量管理体系' },
+  { id:'cold-chain', label:'冷链全程监控', icon:'❄️', gsp:'GSP附录1' },
+  { id:'logistics', label:'物流进度追踪', icon:'🚚', gsp:'GSP第49-52条' },
+  { id:'backup', label:'数据备份与联动', icon:'💾' },
   { id:'ops-flow', label:'标准操作规程(SOP)', icon:'📜', gsp:'质量管理体系' },
   { id:'operation-log', label:'系统操作审计日志', icon:'📝', gsp:'GSP审计追溯' },
   { id:'permission', label:'角色权限管理', icon:'🔐' },
@@ -84,6 +93,10 @@ const routes = [
     children: [
       { path: 'dashboard', component: Dashboard, meta: { title: '智能工作台' } },
       { path: 'report', component: Report, meta: { title: '综合统计报表' } },
+      { path: 'flow-config', component: FlowConfig, meta: { title: '审批流程配置' } },
+      { path: 'cold-chain', component: ColdChain, meta: { title: '冷链全程监控' } },
+      { path: 'logistics', component: Logistics, meta: { title: '物流进度追踪' } },
+      { path: 'backup', component: Backup, meta: { title: '数据备份与联动' } },
       { path: 'module/:id', component: ModulePage },
     ]
   },

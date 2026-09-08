@@ -87,7 +87,11 @@ window.addEventListener('resize', () => {
 
 const activeId = computed(() => {
   if (route.path === '/dashboard') return 'dashboard'
-  return route.params.id || ''
+  if (route.path === '/report') return 'report'
+  if (route.params.id) return route.params.id
+  // P4 专用页（/flow-config 等）
+  const seg = route.path.replace(/^\//, '')
+  return ['flow-config', 'cold-chain', 'logistics', 'backup'].includes(seg) ? seg : ''
 })
 
 const pageTitle = computed(() => {
@@ -98,6 +102,7 @@ const pageTitle = computed(() => {
 function navigate(id) {
   if (id === 'dashboard') router.push('/dashboard')
   else if (id === 'report') router.push('/report')
+  else if (['flow-config', 'cold-chain', 'logistics', 'backup'].includes(id)) router.push('/' + id)
   else router.push('/module/' + id)
 }
 

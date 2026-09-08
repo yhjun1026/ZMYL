@@ -20,6 +20,9 @@ const app = require('./app');
 // 第三步：seed（路由加载后部分表才被 require；幂等）
 ensureSeeds();
 
+// 第三步半：P4 自动备份守护定时器（BACKUP_INTERVAL_HOURS=0 关闭）
+require('./controllers/backup.controller').startAutoBackup();
+
 // 第四步：监听
 const server = app.listen(config.port, () => {
   logger.info(`✓ ZMYL server 启动  http://localhost:${config.port}  env=${config.env}`);

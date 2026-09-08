@@ -70,4 +70,4 @@ server/data/*.db
 server/data/*.db-*
 server/logs/*.log
 server/uploads/*
-!server/uploads/.gitkeep
+!server/uploads/.gitkeepserver/data/backup/

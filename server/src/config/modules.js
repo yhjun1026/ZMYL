@@ -45,6 +45,17 @@ const MODULES = {
   acceptance_doc:        { title: '验收资料',   searchFields: ['title', 'file_name', 'order_no'] }, // P3：PDF 留档
   outbound_template:   { title: '出库模板',     searchFields: ['name', 'description'] },
   system_profile:      { title: '系统配置',     searchFields: ['name'] },
+  // ---- P4 高级特性 ----
+  approval_flow:       { title: '审批流程配置', searchFields: ['flow_code', 'flow_name', 'biz_module'] },
+  approval_flow_log:   { title: '审批流程日志', searchFields: ['flow_code', 'flow_name', 'action'] },
+  cold_chain_device:   { title: '冷链设备',     searchFields: ['device_code', 'device_name', 'location'] },
+  cold_chain_record:   { title: '冷链监测记录', searchFields: ['device_name', 'batch', 'product_name'] },
+  cold_chain_alarm:    { title: '冷链报警',     searchFields: ['alarm_no', 'device_name', 'product_name'] },
+  cold_chain_ledger:   { title: '冷链台账',     searchFields: ['ledger_no', 'product_name', 'batch'] },
+  logistics_carrier:   { title: '承运商档案',   searchFields: ['name', 'carrier_code', 'license_no'] },
+  logistics_order:     { title: '物流单',       searchFields: ['logistics_no', 'product_name', 'carrier_name'] },
+  logistics_node:      { title: '物流轨迹',     searchFields: ['node_name', 'location'] },
+  backup_record:       { title: '备份记录',     searchFields: ['file_name', 'type'] },
 };
 
 // 工作流模式（与前端 ModulePage.vue WF_* 常量对齐）

@@ -11,6 +11,8 @@ const db = require('../db');
 const { success, fail } = require('../utils/response');
 const auditLog = require('../utils/audit');
 const { WORKFLOW } = require('../config/modules');
+const { flowGuard } = require('../utils/flowEngine');
+const { autoCreateProductAcceptance, autoFinanceExpense } = require('../utils/bridge');
 
 const REVIEW_ROLES = new Set(['sys_admin', 'quality_staff', 'quality_mgr']);
 const APPROVE_ROLES = new Set(['sys_admin', 'quality_mgr']);
@@ -38,6 +40,29 @@ function displayName(req) {
   return req.user.name || req.user.username;
 }
 
+// 表名 -> 审批流 biz_module（与 utils/flowEngine BIZ_MODULES 对齐）
+const BIZ_MODULE = {
+  supplier: 'supplier', customer_archive: 'customer-archive', personnel: 'personnel',
+  health_record: 'health-archive', training_plan: 'training',
+  first_factory_audit: 'first-factory', first_product_audit: 'first-product',
+  system_profile: 'system-profile', cert_update_request: 'supplier',
+};
+
+/**
+ * 可配置审批流守卫：该模块有生效流程时按配置校验（配置优先于硬编码角色）
+ * 返回 true 表示已被拦截（响应已发出）；false 表示放行且调用方需继续走硬编码角色校验
+ */
+async function applyFlowGuard(req, res, bizModule, stepNo, action) {
+  const err = await flowGuard(bizModule, stepNo, req, action);
+  if (err) {
+    res.status(err.status).json(fail(err.message, err.status));
+    return true;
+  }
+  const { getActiveFlow } = require('../utils/flowEngine');
+  const flow = await getActiveFlow(bizModule);
+  return !!flow; // 有生效流程 → 硬编码角色校验可跳过
+}
+
 // ============ 两级审批流 ============
 
 /**
@@ -49,7 +74,11 @@ async function review(req, res) {
   if (!WORKFLOW.TWO_LEVEL.includes(resource) && resource !== 'cert_update_request') {
     return res.status(404).json(fail('该模块不支持审核流', 404));
   }
-  if (!REVIEW_ROLES.has(req.userRoleCode)) {
+  const { action = 'approve', opinion = '' } = req.body || {};
+  // 可配置审批流优先：有生效流程则按其配置校验，否则走硬编码角色
+  const flowApplied = await applyFlowGuard(req, res, BIZ_MODULE[resource], 1, action);
+  if (res.writableEnded) return;
+  if (!flowApplied && !REVIEW_ROLES.has(req.userRoleCode)) {
     return res.status(403).json(fail('无审核权限（需质管员或质量负责人）', 403));
   }
 
@@ -60,7 +89,6 @@ async function review(req, res) {
     return res.status(400).json(fail(`仅"待审核"状态可审核（当前: ${obj.workflow_status}）`, 400));
   }
 
-  const { action = 'approve', opinion = '' } = req.body || {};
   const status = action === 'approve' ? '已审核' : '已驳回';
   const reviewer = displayName(req);
 
@@ -83,7 +111,10 @@ async function approve(req, res) {
   if (!WORKFLOW.TWO_LEVEL.includes(resource) && resource !== 'cert_update_request') {
     return res.status(404).json(fail('该模块不支持审批流', 404));
   }
-  if (!APPROVE_ROLES.has(req.userRoleCode)) {
+  const { action = 'approve', opinion = '' } = req.body || {};
+  const flowApplied = await applyFlowGuard(req, res, BIZ_MODULE[resource], 2, action);
+  if (res.writableEnded) return;
+  if (!flowApplied && !APPROVE_ROLES.has(req.userRoleCode)) {
     return res.status(403).json(fail('无审批权限（需质量负责人）', 403));
   }
 
@@ -94,7 +125,6 @@ async function approve(req, res) {
     return res.status(400).json(fail(`仅"已审核"状态可最终批准（当前: ${obj.workflow_status}）`, 400));
   }
 
-  const { action = 'approve', opinion = '' } = req.body || {};
   const status = action === 'approve' ? '已批准' : '已驳回';
   const approver = displayName(req);
 
@@ -116,7 +146,10 @@ async function approve(req, res) {
  */
 async function reviewPlan(req, res) {
   const { id } = req.params;
-  if (!['sys_admin', 'sales_director'].includes(req.userRoleCode)) {
+  const { action = 'approve', opinion = '' } = req.body || {};
+  const flowApplied = await applyFlowGuard(req, res, 'purchase-plan', 1, action);
+  if (res.writableEnded) return;
+  if (!flowApplied && !['sys_admin', 'sales_director'].includes(req.userRoleCode)) {
     return res.status(403).json(fail('无审批权限（需销售总监）', 403));
   }
 
@@ -126,7 +159,6 @@ async function reviewPlan(req, res) {
     return res.status(400).json(fail(`当前状态"${plan.workflow_status}"，无法审核`, 400));
   }
 
-  const { action = 'approve', opinion = '' } = req.body || {};
   const status = action === 'approve' ? '已批准' : '已驳回';
   const reviewer = displayName(req);
 
@@ -211,7 +243,12 @@ async function procFlow(req, res) {
   }
   const step = PROC_STEPS.find((s) => s.action === action);
   if (!step) return res.status(404).json(fail('未知操作', 404));
-  if (!step.roles.includes(req.userRoleCode)) {
+  const { action: act = 'approve', opinion = '' } = req.body || {};
+  // 可配置审批流优先（procurement 模块，step_no = 五步流序号）
+  const stepNo = PROC_STEPS.indexOf(step) + 1;
+  const flowApplied = await applyFlowGuard(req, res, 'procurement', stepNo, act);
+  if (res.writableEnded) return;
+  if (!flowApplied && !step.roles.includes(req.userRoleCode)) {
     return res.status(403).json(fail(`无权限执行[${step.label}]（需角色: ${step.roles.join('/')}）`, 403));
   }
 
@@ -221,7 +258,6 @@ async function procFlow(req, res) {
     return res.status(400).json(fail(`当前状态"${obj.workflow_status}"，不能执行[${step.label}]`, 400));
   }
 
-  const { action: act = 'approve', opinion = '' } = req.body || {};
   const reject = act === 'reject';
   const status = reject ? '已驳回' : step.to;
   const user = displayName(req);
@@ -242,6 +278,21 @@ async function procFlow(req, res) {
   params.push(id);
 
   await db.run(`UPDATE "${resource}" SET ${sets.join(', ')} WHERE id = ?`, params);
+
+  // ---- 数据互联互通（P4）：通过时触发跨模块联动 ----
+  if (!reject && step.action === 'purchaser-accept') {
+    // 采购到货 → 自动创建产品验收记录（幂等）
+    await autoCreateProductAcceptance(Number(id), resource);
+  }
+  if (!reject && step.action === 'quality-approve') {
+    // 采购入库完成 → 自动生成财务支出记录（幂等）
+    const amount = obj.amount || 0;
+    if (amount > 0) {
+      await autoFinanceExpense(obj.order_no || `${resource}#${id}`, amount,
+        obj.type || '采购支出', '采购部',
+        `采购入库自动记账: ${obj.equip_name || ''} x${obj.qty || 0} 供应商:${obj.supplier || ''}`);
+    }
+  }
 
   await logOp(`${resource}#${id} ${step.label} -> ${status}`, user);
   auditLog('WF_PROC', req.userId, `${resource}#${id}`, { action, status });
