@@ -7,7 +7,7 @@
 | **后端** | Node.js 20 + Express + better-sqlite3 + JWT |
 | **前端** | Vue3 + Vite + Element Plus + Pinia + vue-router |
 | **数据库** | SQLite（better-sqlite3，业务代码走 async 门面，可低成本切 MySQL） |
-| **部署** | Docker Compose 双容器（web nginx + api express） |
+| **部署** | Docker Compose 一体化容器（Express 托管前端 dist，单端口 8888） |
 | **架构对齐** | 与 ZM 项目（`/Users/yanghongjun/code/ZM`）100% 一致 |
 
 ## 工程结构
@@ -53,13 +53,39 @@ ZMYLV3/
 │   ├── nginx.conf            # Docker 容器内 nginx
 │   └── nginx.bare.conf       # 裸机部署 nginx
 ├── backend/                  # ⚠️ 旧 Python FastAPI（DEPRECATED，P4 后删）
-├── docker-compose.yml        # 双容器编排
+├── start.sh                  # 一键启动（装依赖 → 构建前端 → 迁移 → 启动 :8888）
+├── package.json              # 根入口（npm start = 一键启动）
+├── docker-compose.yml        # 一体化容器编排
 └── README.md
 ```
 
-## 本地开发（推荐）
+## 一键启动（推荐，服务器部署）
 
-### 1. 启动后端（端口 8080）
+```bash
+./start.sh        # 或：npm start
+# 自动完成：装依赖(如缺) → 构建前端 → 数据库迁移 → 启动
+# 访问 http://服务器IP:8888（前端 + API 同端口，单进程）
+```
+
+常用变体：
+
+| 命令 | 说明 |
+|---|---|
+| `./start.sh` / `npm start` | 生产模式一键启动（:8888） |
+| `./start.sh --rebuild` / `npm run rebuild` | 前端代码更新后强制重新构建 |
+| `./start.sh --dev` / `npm run start:dev` | 开发模式：API :8888 + Vite :5175 热重载 |
+| `PORT=9000 ./start.sh` | 自定义端口 |
+
+Docker 一键部署（同样是单容器单端口 8888）：
+
+```bash
+cp server/.env.example server/.env    # 修改 JWT_SECRET
+docker compose up -d --build          # 访问 http://服务器IP:8888
+```
+
+## 本地开发（分进程调试）
+
+### 1. 启动后端（端口 8888）
 
 ```bash
 cd server
@@ -69,16 +95,17 @@ npm run dev                 # nodemon 热重载
 ```
 
 > 数据库首次启动会自动建表 + 种子数据（admin / 123456）
+> 后端同时会托管 `frontend/dist`（如果已构建），即 :8888 也能直接访问页面
 
-### 2. 启动前端（端口 5173）
+### 2. 启动前端（端口 5175）
 
 ```bash
 cd frontend
 npm install
-npm run dev                 # Vite 代理 /api → :8080
+npm run dev                 # Vite 代理 /api → :8888
 ```
 
-打开 http://localhost:5173 即可登录。
+打开 http://localhost:5175 即可登录（热重载开发用）。
 
 ### 3. 默认账号
 
@@ -87,9 +114,9 @@ npm run dev                 # Vite 代理 /api → :8080
 ## 生产部署（Docker Compose）
 
 ```bash
-cd server && cp .env.example .env    # 修改 JWT_SECRET
-docker compose up -d --build         # web(80) + api(8080)
-# 访问 http://服务器IP
+cp server/.env.example server/.env    # 修改 JWT_SECRET
+docker compose up -d --build          # 一体化容器（前端 + API）
+# 访问 http://服务器IP:8888
 ```
 
 数据持久化：
@@ -103,7 +130,7 @@ docker compose up -d --build         # web(80) + api(8080)
 - Node.js Express 工程骨架（middleware/utils/config/db 全套）
 - 13 角色 + admin 种子数据
 - auth + user + dashboard 三个 controller
-- 双容器 Docker 编排
+- 一键启动（start.sh + 一体化 Docker 容器，单端口 8888）
 - 前端 vue-router + Pinia 接入
 - dashboard 路径修复（前端 /stats → 后端 无后缀）
 - logout 后端路由补齐
@@ -153,13 +180,13 @@ docker compose up -d --build         # web(80) + api(8080)
 | 多租户 | ORM 事件 | P4 接 |
 | JWT 载荷 | username + role | userId + role（轻量） |
 | 数据库 | MySQL | SQLite |
-| 部署 | 单镜像 8000 | 双容器 web(80) + api(8080) |
-| 端口 | 8000 | web:80 + api:8080 |
+| 部署 | 单镜像 8000 | 一体化容器（前端 + API 同端口 8888） |
+| 端口 | 8000 | 8888（dev 前端 5175） |
 
 ## 回退到 Python 后端（如 P1 验证后发现问题）
 
 ```bash
-docker compose down          # 停掉双容器
+docker compose down          # 停掉容器
 cd backend
 docker compose up -d --build # 用老的 docker-compose
 ```

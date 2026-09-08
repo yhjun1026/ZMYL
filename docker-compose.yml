@@ -1,33 +1,27 @@
 version: '3.8'
 
-# ZMYL 双容器部署（Node.js API + Nginx 前端）
+# ZMYL 一体化部署（前端 + API 同容器，单端口 8888）
+# 一键启动：docker compose up -d --build → http://服务器IP:8888
 # 使用前：cp server/.env.example server/.env 并设置 JWT_SECRET 等
 
 services:
-  api:
+  app:
     build:
-      context: ./server
-      dockerfile: Dockerfile
-    image: zmyl-api:latest
-    container_name: zmyl-api
-    expose:
-      - "8080"
+      context: .
+      dockerfile: server/Dockerfile
+    image: zmyl-app:latest
+    container_name: zmyl-app
+    ports:
+      - "8888:8888"
     volumes:
       - ./server/data:/app/data
       - ./server/logs:/app/logs
       - ./server/uploads:/app/uploads
     env_file:
       - ./server/.env
-    restart: unless-stopped
-
-  web:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    image: zmyl-web:latest
-    container_name: zmyl-web
-    ports:
-      - "80:80"
-    depends_on:
-      - api
+    environment:
+      # 覆盖 .env 里的开发值，容器内固定生产模式
+      NODE_ENV: production
+      PORT: "8888"
+      FRONTEND_DIST: /app/frontend-dist
     restart: unless-stopped

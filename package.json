@@ -1,0 +1,17 @@
+{
+  "name": "zmyl",
+  "version": "3.0.0",
+  "private": true,
+  "description": "卓盟医疗器械全生命周期管理平台 v3.0 —— 一键启动入口（前端 + 后端单端口 8888）",
+  "scripts": {
+    "start": "bash start.sh",
+    "start:dev": "bash start.sh --dev",
+    "rebuild": "bash start.sh --rebuild",
+    "build": "bash start.sh --build-only",
+    "docker": "docker compose up -d --build",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

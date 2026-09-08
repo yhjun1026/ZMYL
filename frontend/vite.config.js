@@ -7,7 +7,7 @@ export default defineConfig({
     host: '::',
     port: 5175,
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true }
+      '/api': { target: 'http://localhost:8888', changeOrigin: true }
     }
   },
   build: { outDir: 'dist', chunkSizeWarningLimit: 1500 }

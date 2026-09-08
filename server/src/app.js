@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
+const fs = require('fs');
 
 const config = require('./config');
 const logger = require('./utils/logger');
@@ -61,7 +62,19 @@ function buildApp() {
   // 8. 静态资源（uploads）
   app.use('/uploads', express.static(config.upload.dir));
 
-  // 9. 404 + 错误处理
+  // 9. 前端静态托管（一键模式：frontend/dist 存在时由本进程直接托管，前后端同端口）
+  if (fs.existsSync(config.frontend.dist)) {
+    logger.info(`[startup] 前端构建产物已挂载：${config.frontend.dist}`);
+    app.use(express.static(config.frontend.dist, { maxAge: '7d', index: false }));
+    // SPA 回退：非 /api /uploads 的 GET 一律返回 index.html（交给 vue-router）
+    app.get(/^\/(?!api(?:\/|$)|uploads(?:\/|$)).*/, (req, res) => {
+      res.sendFile(path.join(config.frontend.dist, 'index.html'));
+    });
+  } else if (config.isProd) {
+    logger.warn(`[startup] 未找到前端构建产物（${config.frontend.dist}），本进程仅提供 API 服务；请先构建前端或设置 FRONTEND_DIST`);
+  }
+
+  // 10. 404 + 错误处理
   app.use(notFound);
   app.use(errorHandler);
 

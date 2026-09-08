@@ -5,8 +5,15 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 
 const config = {
   env: NODE_ENV,
-  port: parseInt(process.env.PORT || '8080', 10),
+  port: parseInt(process.env.PORT || '8888', 10),
   isProd: NODE_ENV === 'production',
+
+  // 一键模式：Express 直接托管前端构建产物（前后端同端口）
+  frontend: {
+    dist: process.env.FRONTEND_DIST
+      ? path.resolve(process.env.FRONTEND_DIST)
+      : path.resolve(__dirname, '..', '..', '..', 'frontend', 'dist'),
+  },
 
   db: {
     path: path.resolve(__dirname, '..', '..', process.env.DB_PATH || './data/zmyl.db'),
