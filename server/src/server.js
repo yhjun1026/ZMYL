@@ -29,12 +29,11 @@ const server = app.listen(config.port, () => {
 function shutdown(signal) {
   logger.info(`收到 ${signal}，准备关闭...`);
   server.close(() => {
-    try {
-      const db = require('./db');
-      db.close();
-      logger.info('✓ DB closed');
-    } catch {}
-    process.exit(0);
+    const db = require('./db');
+    db.close()
+      .then(() => logger.info('✓ DB closed'))
+      .catch(() => {})
+      .finally(() => process.exit(0));
   });
   // 5s 兜底
   setTimeout(() => {

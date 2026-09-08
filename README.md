@@ -6,7 +6,7 @@
 |------|--------|
 | **后端** | Node.js 20 + Express + better-sqlite3 + JWT |
 | **前端** | Vue3 + Vite + Element Plus + Pinia + vue-router |
-| **数据库** | SQLite（better-sqlite3 同步驱动） |
+| **数据库** | SQLite（better-sqlite3，业务代码走 async 门面，可低成本切 MySQL） |
 | **部署** | Docker Compose 双容器（web nginx + api express） |
 | **架构对齐** | 与 ZM 项目（`/Users/yanghongjun/code/ZM`）100% 一致 |
 
@@ -107,6 +107,20 @@ docker compose up -d --build         # web(80) + api(8080)
 - 前端 vue-router + Pinia 接入
 - dashboard 路径修复（前端 /stats → 后端 无后缀）
 - logout 后端路由补齐
+- DB async 门面（业务代码统一 `await db.get/all/run`，切换 MySQL 只改 `db/index.js` 一个文件）
+
+## 数据库切换说明（SQLite → MySQL）
+
+业务代码（controllers / middleware / utils）从第一天起就只调用 **async 门面**（`db.get / db.all / db.run / db.exec / db.transaction`），不直接触碰 better-sqlite3。将来切 MySQL 时：
+
+| 步骤 | 工作量 |
+|---|---|
+| 重写 `server/src/db/index.js`（better-sqlite3 → mysql2/promise 连接池，保持同名 API） | 半天 |
+| `migrations/*.js` DDL 按方言重写（AUTOINCREMENT → AUTO_INCREMENT 等） | 半天 |
+| 存量数据 ETL（sqlite3-to-mysql / 手写脚本） | ~1 天 |
+| **controllers / middleware / utils 改动** | **0 行** |
+
+约定：迁移基建（`migrate.js` / `migrations/` / `ensureSchema.js`）使用 `db.raw` 原始句柄（同步），业务代码禁止使用 `raw`。
 
 ### 🚧 P2 — 业务基础（下一阶段）
 - 39 张业务表 DDL（沿用当前 ZMYLV3 字段定义）

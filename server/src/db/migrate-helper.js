@@ -3,7 +3,7 @@
  * 不直接 require ./migrate.js 避免循环依赖
  */
 const migrations = require('./migrations');
-const db = require('./index');
+const { raw: db } = require('./index');
 const logger = require('../utils/logger');
 
 function ensureMigrationsTable() {

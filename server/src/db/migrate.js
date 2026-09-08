@@ -5,7 +5,7 @@
 const path = require('path');
 const fs = require('fs');
 const config = require('../config');
-const db = require('./index');
+const { raw: db } = require('./index');
 const logger = require('../utils/logger');
 
 const migrationsDir = path.join(__dirname, 'migrations');

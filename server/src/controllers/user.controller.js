@@ -6,15 +6,15 @@ const auditLog = require('../utils/audit');
 /**
  * GET /api/user/roles/all
  */
-function listRoles(req, res) {
-  const rows = db.prepare('SELECT id, code, name, description FROM roles ORDER BY rank DESC').all();
+async function listRoles(req, res) {
+  const rows = await db.all('SELECT id, code, name, description FROM roles ORDER BY rank DESC');
   return res.json(success(rows));
 }
 
 /**
  * GET /api/user?page=1&size=20&keyword=xxx
  */
-function listUsers(req, res) {
+async function listUsers(req, res) {
   const page = Math.max(1, parseInt(req.query.page || '1', 10));
   const size = Math.min(100, Math.max(1, parseInt(req.query.size || '20', 10)));
   const keyword = (req.query.keyword || '').trim();
@@ -28,13 +28,12 @@ function listUsers(req, res) {
     params.push(k, k, k);
   }
 
-  const total = db.prepare(`SELECT COUNT(*) c FROM users ${where}`).get(...params).c;
-  const rows = db
-    .prepare(
-      `SELECT id, username, name, dept, role_code, role, phone, email, status, last_login_at, created_at
-       FROM users ${where} ORDER BY id DESC LIMIT ? OFFSET ?`
-    )
-    .all(...params, size, offset);
+  const total = (await db.get(`SELECT COUNT(*) c FROM users ${where}`, params)).c;
+  const rows = await db.all(
+    `SELECT id, username, name, dept, role_code, role, phone, email, status, last_login_at, created_at
+     FROM users ${where} ORDER BY id DESC LIMIT ? OFFSET ?`,
+    [...params, size, offset]
+  );
 
   return res.json(success({ list: rows, total, page, size }));
 }
@@ -43,36 +42,35 @@ function listUsers(req, res) {
  * POST /api/user
  * body: { username, password, name, dept, role_code, phone, email }
  */
-function createUser(req, res) {
+async function createUser(req, res) {
   const { username, password, name, dept, role_code, phone, email } = req.body;
 
   if (!username || !password || !name || !role_code) {
     return res.json(fail('请填写完整：用户名/密码/姓名/角色'));
   }
 
-  const exists = db.prepare('SELECT 1 FROM users WHERE username = ?').get(username);
+  const exists = await db.get('SELECT 1 AS one FROM users WHERE username = ?', [username]);
   if (exists) return res.json(fail('用户名已存在'));
 
   // 角色名查找
-  const role = db.prepare('SELECT name FROM roles WHERE code = ?').get(role_code);
+  const role = await db.get('SELECT name FROM roles WHERE code = ?', [role_code]);
   if (!role) return res.json(fail('角色不存在'));
 
   const hash = bcrypt.hashSync(password, 10);
-  const info = db
-    .prepare(
-      `INSERT INTO users (username, password_hash, name, dept, role_code, role, phone, email, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, '启用')`
-    )
-    .run(username, hash, name, dept || '', role_code, role.name, phone || '', email || '');
+  const info = await db.run(
+    `INSERT INTO users (username, password_hash, name, dept, role_code, role, phone, email, status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, '启用')`,
+    [username, hash, name, dept || '', role_code, role.name, phone || '', email || '']
+  );
 
-  auditLog('CREATE_USER', req.userId, String(info.lastInsertRowid), { username });
-  return res.json(success({ id: info.lastInsertRowid }, '用户创建成功'));
+  auditLog('CREATE_USER', req.userId, String(info.insertId), { username });
+  return res.json(success({ id: info.insertId }, '用户创建成功'));
 }
 
 /**
  * PUT /api/user/:id
  */
-function updateUser(req, res) {
+async function updateUser(req, res) {
   const { id } = req.params;
   const { name, dept, role_code, phone, email, status } = req.body;
 
@@ -82,7 +80,7 @@ function updateUser(req, res) {
     return res.json(fail('无权操作其他用户'));
   }
 
-  const user = db.prepare('SELECT id, role_code FROM users WHERE id = ?').get(targetId);
+  const user = await db.get('SELECT id, role_code FROM users WHERE id = ?', [targetId]);
   if (!user) return res.json(fail('用户不存在'));
 
   let roleName = null;
@@ -90,7 +88,7 @@ function updateUser(req, res) {
     if (req.userRoleCode !== 'sys_admin') {
       return res.json(fail('无权修改用户角色'));
     }
-    const r = db.prepare('SELECT name FROM roles WHERE code = ?').get(role_code);
+    const r = await db.get('SELECT name FROM roles WHERE code = ?', [role_code]);
     if (!r) return res.json(fail('角色不存在'));
     roleName = r.name;
   }
@@ -111,7 +109,7 @@ function updateUser(req, res) {
   fields.push("updated_at = datetime('now','localtime')");
   params.push(targetId);
 
-  db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).run(...params);
+  await db.run(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, params);
   auditLog('UPDATE_USER', req.userId, String(targetId));
   return res.json(success(null, '用户已更新'));
 }
@@ -119,12 +117,12 @@ function updateUser(req, res) {
 /**
  * DELETE /api/user/:id
  */
-function deleteUser(req, res) {
+async function deleteUser(req, res) {
   const targetId = parseInt(req.params.id, 10);
   if (targetId === req.userId) return res.json(fail('不能删除自己'));
   if (req.userRoleCode !== 'sys_admin') return res.json(fail('仅系统管理员可删除用户'));
 
-  const info = db.prepare('DELETE FROM users WHERE id = ?').run(targetId);
+  const info = await db.run('DELETE FROM users WHERE id = ?', [targetId]);
   if (info.changes === 0) return res.json(fail('用户不存在'));
 
   auditLog('DELETE_USER', req.userId, String(targetId));

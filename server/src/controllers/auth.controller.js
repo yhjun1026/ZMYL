@@ -9,17 +9,16 @@ const logger = require('../utils/logger');
  * POST /api/auth/login
  * body: { username, password }
  */
-function login(req, res) {
+async function login(req, res) {
   const { username, password } = req.body;
   if (!username || !password) {
     return res.json(fail('请输入用户名和密码'));
   }
 
-  const user = db
-    .prepare(
-      'SELECT id, username, password_hash, name, dept, role_code, role, phone, email, status FROM users WHERE username = ?'
-    )
-    .get(username);
+  const user = await db.get(
+    'SELECT id, username, password_hash, name, dept, role_code, role, phone, email, status FROM users WHERE username = ?',
+    [username]
+  );
 
   if (!user) {
     auditLog('LOGIN_FAIL', null, username, { reason: 'user_not_found' });
@@ -40,8 +39,10 @@ function login(req, res) {
     if (ok) {
       // 自动升级为 bcrypt
       const newHash = bcrypt.hashSync(password, 10);
-      db.prepare('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?')
-        .run(newHash, user.id);
+      await db.run(
+        "UPDATE users SET password_hash = ?, updated_at = datetime('now','localtime') WHERE id = ?",
+        [newHash, user.id]
+      );
       user.password_hash = newHash;
       logger.info(`✓ [auto-upgrade] 用户 ${username} 密码已升级为 bcrypt`);
     }
@@ -53,9 +54,10 @@ function login(req, res) {
   }
 
   // 更新 last_login_at
-  db.prepare(
-    'UPDATE users SET last_login_at = datetime(\'now\',\'localtime\') WHERE id = ?'
-  ).run(user.id);
+  await db.run(
+    "UPDATE users SET last_login_at = datetime('now','localtime') WHERE id = ?",
+    [user.id]
+  );
 
   // 签发 token
   const token = signToken(user.id, user.role || user.role_code, {
@@ -77,12 +79,11 @@ function login(req, res) {
 /**
  * GET /api/auth/me
  */
-function me(req, res) {
-  const user = db
-    .prepare(
-      'SELECT id, username, name, dept, role_code, role, phone, email, status, last_login_at FROM users WHERE id = ?'
-    )
-    .get(req.userId);
+async function me(req, res) {
+  const user = await db.get(
+    'SELECT id, username, name, dept, role_code, role, phone, email, status, last_login_at FROM users WHERE id = ?',
+    [req.userId]
+  );
 
   if (!user) return res.json(fail('用户不存在'));
   return res.json(success(user));
@@ -91,7 +92,7 @@ function me(req, res) {
 /**
  * POST /api/auth/logout
  */
-function logout(req, res) {
+async function logout(req, res) {
   auditLog('LOGOUT', req.userId, req.user.username);
   return res.json(success(null, '已退出登录'));
 }
@@ -100,7 +101,7 @@ function logout(req, res) {
  * POST /api/auth/change-password
  * body: { oldPassword, newPassword }
  */
-function changePassword(req, res) {
+async function changePassword(req, res) {
   const { oldPassword, newPassword } = req.body;
 
   if (!oldPassword || !newPassword) {
@@ -113,7 +114,7 @@ function changePassword(req, res) {
     return res.json(fail('新密码必须包含字母和数字'));
   }
 
-  const user = db.prepare('SELECT id, password_hash FROM users WHERE id = ?').get(req.userId);
+  const user = await db.get('SELECT id, password_hash FROM users WHERE id = ?', [req.userId]);
   if (!user) return res.json(fail('用户不存在'));
 
   // 校验旧密码
@@ -126,9 +127,10 @@ function changePassword(req, res) {
   if (!ok) return res.json(fail('原密码错误'));
 
   const newHash = bcrypt.hashSync(newPassword, 10);
-  db.prepare(
-    'UPDATE users SET password_hash = ?, updated_at = datetime(\'now\',\'localtime\') WHERE id = ?'
-  ).run(newHash, req.userId);
+  await db.run(
+    "UPDATE users SET password_hash = ?, updated_at = datetime('now','localtime') WHERE id = ?",
+    [newHash, req.userId]
+  );
 
   auditLog('CHANGE_PASSWORD', req.userId, req.user.username);
   return res.json(success(null, '密码修改成功'));
