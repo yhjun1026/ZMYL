@@ -8,4 +8,7 @@ router.use('/auth', require('./auth.routes'));
 router.use('/user', require('./user.routes'));
 router.use('/dashboard', require('./dashboard.routes'));
 
+// 动态模块 CRUD + 工作流（39 张业务表，挂在 /api/{table}）
+router.use('/', require('./crud.routes'));
+
 module.exports = router;

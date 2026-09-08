@@ -4,4 +4,5 @@
  */
 module.exports = [
   require('./migrations/001_init_users_roles'),
+  require('./migrations/002_business_tables'),
 ];

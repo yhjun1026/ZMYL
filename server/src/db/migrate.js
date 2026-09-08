@@ -98,16 +98,17 @@ function reset() {
     process.exit(1);
   }
 
-  // 所有业务表白名单（不含 _migrations / audit_log）
-  const ALL_TABLES = [
-    'users', 'roles',
-  ];
+  // 动态取全部业务表（保留 _migrations / sqlite 内部表）
+  const tables = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT IN ('_migrations')")
+    .all()
+    .map((r) => r.name);
 
-  for (const t of ALL_TABLES) {
-    db.exec(`DROP TABLE IF EXISTS ${t};`);
+  for (const t of tables) {
+    db.exec(`DROP TABLE IF EXISTS "${t}";`);
   }
   db.exec('DELETE FROM _migrations;');
-  logger.info('✓ 所有业务表已 DROP');
+  logger.info(`✓ 已 DROP ${tables.length} 张业务表`);
   up();
   seed();
 }
