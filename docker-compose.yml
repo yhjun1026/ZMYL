@@ -1,0 +1,56 @@
+version: "3.8"
+
+# 卓盟医疗器械管理平台 v3.0 —— 前后端一体部署
+# 使用前：cp .env.example .env 并修改全部密码
+
+services:
+  app:
+    build: .
+    container_name: med-app
+    restart: always
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USER: med_admin
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      DB_NAME: medical_device
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - uploads:/app/uploads
+    networks: [med-net]
+
+  mysql:
+    image: mysql:8.0
+    container_name: med-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: medical_device
+      MYSQL_USER: med_admin
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/migration:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [med-net]
+
+networks:
+  med-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  uploads:
