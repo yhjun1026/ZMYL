@@ -129,4 +129,27 @@ async function deleteUser(req, res) {
   return res.json(success(null, '用户已删除'));
 }
 
-module.exports = { listRoles, listUsers, createUser, updateUser, deleteUser };
+/**
+ * PUT /api/user/:id/reset-password
+ * body: { newPassword } — 仅系统管理员可重置任意用户密码
+ */
+async function resetPassword(req, res) {
+  const targetId = parseInt(req.params.id, 10);
+  if (req.userRoleCode !== 'sys_admin') return res.json(fail('仅系统管理员可重置密码'));
+
+  const { newPassword } = req.body;
+  if (!newPassword || String(newPassword).length < 6) return res.json(fail('新密码至少6位'));
+
+  const u = await db.get('SELECT id FROM users WHERE id = ?', [targetId]);
+  if (!u) return res.json(fail('用户不存在'));
+
+  const hash = bcrypt.hashSync(String(newPassword), 10);
+  await db.run(
+    "UPDATE users SET password_hash = ?, updated_at = datetime('now','localtime') WHERE id = ?",
+    [hash, targetId]
+  );
+  auditLog('RESET_PASSWORD', req.userId, String(targetId));
+  return res.json(success(null, '密码已重置'));
+}
+
+module.exports = { listRoles, listUsers, createUser, updateUser, deleteUser, resetPassword };

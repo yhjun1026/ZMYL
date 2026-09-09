@@ -40,6 +40,11 @@ function buildApp() {
       if (config.cors.origins.includes(origin) || config.cors.origins.includes('*')) {
         return cb(null, true);
       }
+      // 本机任意端口放行（vite build 产物为 crossorigin module script，
+      // 同源请求也会带 Origin 头，端口不固定：8888 生产 / 5173 dev / 自定义端口）
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return cb(null, true);
+      }
       return cb(new Error(`CORS blocked: ${origin}`));
     },
     credentials: true,

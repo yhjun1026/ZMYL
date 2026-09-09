@@ -32,5 +32,6 @@ router.get('/', requireAction('user:list'), asyncHandler(ctrl.listUsers));
 router.post('/', requireAction('user:create'), validate(createUserSchema), asyncHandler(ctrl.createUser));
 router.put('/:id', requireAction('user:update'), validate(updateUserSchema), asyncHandler(ctrl.updateUser));
 router.delete('/:id', requireAction('user:delete'), asyncHandler(ctrl.deleteUser));
+router.put('/:id/reset-password', requireAction('user:update'), asyncHandler(ctrl.resetPassword));
 
 module.exports = router;

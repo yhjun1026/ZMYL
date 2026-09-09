@@ -89,9 +89,9 @@ const activeId = computed(() => {
   if (route.path === '/dashboard') return 'dashboard'
   if (route.path === '/report') return 'report'
   if (route.params.id) return route.params.id
-  // P4 专用页（/flow-config 等）
+  // P4 专用页（/flow-config 等）+ 独立页面（/permission /settings）
   const seg = route.path.replace(/^\//, '')
-  return ['flow-config', 'cold-chain', 'logistics', 'backup'].includes(seg) ? seg : ''
+  return ['flow-config', 'cold-chain', 'logistics', 'backup', 'permission', 'settings'].includes(seg) ? seg : ''
 })
 
 const pageTitle = computed(() => {
@@ -102,7 +102,7 @@ const pageTitle = computed(() => {
 function navigate(id) {
   if (id === 'dashboard') router.push('/dashboard')
   else if (id === 'report') router.push('/report')
-  else if (['flow-config', 'cold-chain', 'logistics', 'backup'].includes(id)) router.push('/' + id)
+  else if (['flow-config', 'cold-chain', 'logistics', 'backup', 'permission', 'settings'].includes(id)) router.push('/' + id)
   else router.push('/module/' + id)
 }
 

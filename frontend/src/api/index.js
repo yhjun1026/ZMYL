@@ -1,7 +1,10 @@
 import axios from 'axios';
 import router from '../router';
 
-const http = axios.create({ baseURL: '', timeout: 20000 });
+// baseURL 跟随 vite base：子路径构建（BASE_PATH=/yl/）时所有 /api 请求自动带 /yl 前缀
+// axios 的 combineURLs 会把 baseURL 与请求路径拼接，'/' 开头的 url 不会覆盖 baseURL 的路径部分
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, '') // '/yl/' -> '/yl'；'/' -> ''
+const http = axios.create({ baseURL: BASE, timeout: 20000 });
 
 // token key 统一（前后端对齐到 zmyl_*，前端 localStorage 名）
 export const TOKEN_KEY = 'zmyl_token';
@@ -53,6 +56,7 @@ export const user = {
   create: (data) => http.post('/api/user', data),
   update: (id, data) => http.put('/api/user/' + id, data),
   remove: (id) => http.delete('/api/user/' + id),
+  resetPassword: (id, newPassword) => http.put(`/api/user/${id}/reset-password`, { newPassword }),
 }
 
 export const dashboard = () => http.get('/api/dashboard')
@@ -121,8 +125,8 @@ export const fileApi = {
     http.post('/api/acceptance_doc', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
   listDocs: (params) => http.get('/api/acceptance_doc', { params }),
   removeDoc: (id) => http.delete('/api/acceptance_doc/' + id),
-  // 浏览器直接打开（iframe/新窗口用，token 走查询参数）
-  docUrl: (id) => `/api/acceptance_doc/${id}/file?token=${encodeURIComponent(localStorage.getItem(TOKEN_KEY) || '')}`,
+  // 浏览器直接打开（iframe/新窗口用，token 走查询参数）；带 base 前缀以兼容子路径部署
+  docUrl: (id) => `${BASE}/api/acceptance_doc/${id}/file?token=${encodeURIComponent(localStorage.getItem(TOKEN_KEY) || '')}`,
 }
 
 // ===== 可配置审批流（P4） =====

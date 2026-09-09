@@ -94,7 +94,7 @@ OB=$(curl -s -X POST "$BASE/outbound_record" -H "$AUTH" -H 'Content-Type: applic
   -d "{\"customer\":\"E2E测试医院\",\"equip_name\":\"$INV_NAME\",\"batch\":\"E2E-B1\",\"qty\":10,\"price\":1000,\"total\":10000}")
 OB_ID=$(jqget "$OB" "d['data']['id']")
 OB_STATUS=$(jqget "$OB" "d['data']['status']")
-[ "$OB_STATUS" = "待销售经理审核" ] && ok "创建出库单#$OB_ID（起点=待销售经理审核）" || bad "出库单创建状态异常: $OB_STATUS"
+[ "$OB_STATUS" = "待销售经理审核" ] && ok "创建出库单#${OB_ID}（起点=待销售经理审核）" || bad "出库单创建状态异常: $OB_STATUS"
 RESERVED=$(jqget "$OB" "d['data']['reserved_qty']")
 [ "$RESERVED" = "10" ] && ok "库存预占 reserved_qty=10" || bad "预占异常 reserved_qty=$RESERVED"
 
@@ -116,7 +116,7 @@ d = json.load(sys.stdin)
 recs = [r for r in d['data']['records'] if r.get('batch') == 'E2E-B1']
 print(recs[0]['qty'] if recs else -1)" 2>/dev/null)
 EXPECT=$((INV_QTY_BEFORE - 10))
-[ "$INV_AFTER" = "$EXPECT" ] && ok "库存已扣减: $INV_QTY_BEFORE → $INV_AFTER" || bad "库存扣减异常: $INV_AFTER（期望 $EXPECT）"
+[ "$INV_AFTER" = "$EXPECT" ] && ok "库存已扣减: $INV_QTY_BEFORE → $INV_AFTER" || bad "库存扣减异常: ${INV_AFTER}（期望 ${EXPECT}）"
 # 财务自动记账
 FIN=$(curl -s "$BASE/finance_record?keyword=$OB_ID" -H "$AUTH")
 FIN_N=$(echo "$FIN" | /usr/bin/python3 -c "
@@ -163,7 +163,7 @@ UNREAD_N=$(jqget "$UNREAD" "d['data']['count']")
 [ "${UNREAD_N:-0}" -ge 1 ] && ok "未读通知 $UNREAD_N 条（出库流转已推送）" || bad "未读通知为 0（推送链路异常）"
 NOTIF=$(curl -s "$BASE/notifications" -H "$AUTH")
 N_ID=$(jqget "$NOTIF" "d['data'][0]['id']")
-[ -n "$N_ID" ] && ok "通知列表（首条 id=$N_ID）" || bad "通知列表为空"
+[ -n "$N_ID" ] && ok "通知列表（首条 id=${N_ID}）" || bad "通知列表为空"
 curl -s -X PUT "$BASE/notifications/$N_ID/read" -H "$AUTH" | grep -q '已读' && ok "标记单条已读" || bad "markRead 失败"
 curl -s -X PUT "$BASE/notifications/read-all" -H "$AUTH" | grep -q '已读' && ok "全部已读" || bad "read-all 失败"
 UNREAD2=$(curl -s "$BASE/notifications/unread-count" -H "$AUTH")
@@ -186,7 +186,7 @@ step "9. P3-验收资料 PDF 上传/下载/删除"
 printf '%%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>endobj\nxref\n0 4\ntrailer<</Size 4/Root 1 0 R>>\n%%%%EOF\n' > /tmp/e2e-test.pdf
 UP=$(curl -s -X POST "$BASE/acceptance_doc" -H "$AUTH" -F "file=@/tmp/e2e-test.pdf" -F "biz_type=procurement" -F "biz_id=$PROC_ID" -F "order_no=E2E" -F "title=E2E验收资料")
 DOC_ID=$(jqget "$UP" "d['data']['id']")
-[ -n "$DOC_ID" ] && ok "上传 PDF（doc#$DOC_ID）" || bad "PDF 上传失败: $UP"
+[ -n "$DOC_ID" ] && ok "上传 PDF（doc#{DOC_ID}）" || bad "PDF 上传失败: $UP"
 # 非法格式拦截
 BADUP=$(curl -s -X POST "$BASE/acceptance_doc" -H "$AUTH" -F "file=@/tmp/mig.log;filename=x.txt" -F "biz_type=procurement" -F "biz_id=1")
 echo "$BADUP" | grep -q 'PDF' && ok "非 PDF 上传被拦截" || bad "非 PDF 竟然上传成功"
@@ -214,7 +214,7 @@ import sys, json
 d = json.load(sys.stdin)
 types = set(r.get('bridge_type','') for r in d['data']['records'])
 print(('Y' if '采购转验收' in types else 'N') + ('Y' if '采购转财务' in types else 'N'))" 2>/dev/null)
-echo "$BRIDGE" | grep -q 'Y' && ok "桥接日志: 采购转验收（联动 $BRIDGE）" || bad "采购转验收联动缺失"
+echo "$BRIDGE" | grep -q 'Y' && ok "桥接日志: 采购转验收（联动 ${BRIDGE}）" || bad "采购转验收联动缺失"
 [ "$BRIDGE" = "YY" ] && ok "桥接日志: 采购转财务" || bad "采购转财务联动缺失"
 # 采购到货自动创建的产品验收记录（linked_proc_id = PROC_ID）
 PA_AUTO=$(curl -s "$BASE/product_acceptance?page=1&size=100" -H "$AUTH" | /usr/bin/python3 -c "
@@ -237,7 +237,7 @@ step "12. P4-可配置审批流引擎（生命周期 + 业务驱动）"
 FLOW=$(curl -s -X POST "$BASE/approval-flows" -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"flow_code":"e2e_customer_flow","flow_name":"E2E客户审批流","biz_module":"customer-archive","steps":[{"step_no":1,"step_name":"质管审核","approver_role":"quality_mgr","approver_role_name":"质量负责人"},{"step_no":2,"step_name":"负责人批准","approver_role":"quality_mgr","approver_role_name":"质量负责人","can_reject":false}]}')
 FLOW_ID=$(jqget "$FLOW" "d['data']['id']")
-[ -n "$FLOW_ID" ] && ok "创建审批流#$FLOW_ID（草稿）" || bad "流程创建失败: $FLOW"
+[ -n "$FLOW_ID" ] && ok "创建审批流#{FLOW_ID}（草稿）" || bad "流程创建失败: $FLOW"
 curl -s -X POST "$BASE/approval-flows/$FLOW_ID/submit" -H "$AUTH" | grep -q 'pending' && ok "提交 → 待质量负责人审批" || bad "submit 失败"
 curl -s -X POST "$BASE/approval-flows/$FLOW_ID/approve" -H "$AUTH" -H 'Content-Type: application/json' -d '{"action":"approve"}' | grep -q 'active' && ok "质量负责人通过 → 已生效" || bad "approve 失败"
 HOOKS=$(curl -s "$BASE/approval-flows/hooks" -H "$AUTH")
@@ -278,7 +278,7 @@ DEV=$(curl -s -X POST "$BASE/cold-chain/devices" -H "$AUTH" -H 'Content-Type: ap
   -d '{"device_name":"E2E冷藏车","device_type":"冷藏车","node_type":"transport","vehicle_no":"沪E2E001"}')
 DEV_ID=$(jqget "$DEV" "d['data']['id']")
 APIKEY=$(jqget "$DEV" "d['data']['device']['api_key']")
-[ -n "$DEV_ID" ] && [ -n "$APIKEY" ] && ok "冷链设备#$DEV_ID（IoT密钥已生成）" || bad "设备创建失败: $DEV"
+[ -n "$DEV_ID" ] && [ -n "$APIKEY" ] && ok "冷链设备#{DEV_ID}（IoT密钥已生成）" || bad "设备创建失败: $DEV"
 # IoT 上报（免登录，api_key 认证）
 R=$(curl -s -X POST "$BASE/cold-chain/iot/report" -H 'Content-Type: application/json' \
   -d "{\"api_key\":\"$APIKEY\",\"temp\":5.0,\"humid\":60,\"batch\":\"E2E-CC-1\",\"product_name\":\"E2E冷链品\"}")
@@ -289,7 +289,7 @@ ALARM_ID=$(jqget "$R" "d['data']['alarm_id']")
 [ -n "$ALARM_ID" ] && ok "IoT 超标温度 → 自动生成报警#$ALARM_ID" || bad "超标报警未生成: $R"
 # 无 key 被拒
 CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/cold-chain/iot/report" -H 'Content-Type: application/json' -d '{"temp":5}')
-[ "$CODE" = "401" ] && ok "IoT 无 api_key 被拒（401）" || bad "IoT 认证缺失（HTTP $CODE）"
+[ "$CODE" = "401" ] && ok "IoT 无 api_key 被拒（401）" || bad "IoT 认证缺失（HTTP ${CODE}）"
 # 报警处理闭环
 curl -s -X POST "$BASE/cold-chain/alarms/$ALARM_ID/handle" -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"status":"resolved","handle_action":"检修制冷","handle_result":"已恢复"}' | grep -q 'resolved' && ok "报警处理闭环" || bad "报警处理失败"
@@ -309,12 +309,12 @@ step "14. P4-物流进度追踪（承运商/运单/轨迹/冷链联动）"
 CAR=$(curl -s -X POST "$BASE/logistics/carriers" -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"name":"E2E顺丰冷运","cold_chain_qualified":true,"phone":"95338"}')
 CAR_ID=$(jqget "$CAR" "d['data']['id']")
-[ -n "$CAR_ID" ] && ok "承运商#$CAR_ID（冷链资质）" || bad "承运商创建失败: $CAR"
+[ -n "$CAR_ID" ] && ok "承运商#{CAR_ID}（冷链资质）" || bad "承运商创建失败: $CAR"
 LO=$(curl -s -X POST "$BASE/logistics/orders" -H "$AUTH" -H 'Content-Type: application/json' \
   -d "{\"related_type\":\"outbound\",\"related_no\":\"E2E-SO\",\"carrier_id\":$CAR_ID,\"transport_mode\":\"cold_chain\",\"origin\":\"上海\",\"destination\":\"北京\",\"product_name\":\"E2E冷链品\",\"batch\":\"E2E-CC-1\",\"quantity\":10,\"customer_name\":\"E2E北京医院\"}")
 LO_ID=$(jqget "$LO" "d['data']['id']")
 LO_NO=$(jqget "$LO" "d['data']['logistics_no']")
-[ -n "$LO_ID" ] && ok "物流单 $LO_NO（冷链）" || bad "物流单创建失败: $LO"
+[ -n "$LO_ID" ] && ok "物流单 ${LO_NO}（冷链）" || bad "物流单创建失败: $LO"
 curl -s -X POST "$BASE/logistics/orders/$LO_ID/nodes" -H "$AUTH" -H 'Content-Type: application/json' \
   -d '{"node_code":"shipped","location":"上海青浦","temp":4.5,"humid":55}' | grep -q '已发运' && ok "节点: 发运（随车温度入冷链记录）" || bad "发运节点失败"
 curl -s -X POST "$BASE/logistics/orders/$LO_ID/nodes" -H "$AUTH" -H 'Content-Type: application/json' \
@@ -324,7 +324,7 @@ R=$(curl -s -X POST "$BASE/logistics/orders/$LO_ID/nodes" -H "$AUTH" -H 'Content
 echo "$R" | grep -q '已签收' && ok "节点: 签收（进度100%）" || bad "签收失败: $R"
 # 已签收不可再追加节点
 CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE/logistics/orders/$LO_ID/nodes" -H "$AUTH" -H 'Content-Type: application/json' -d '{"node_code":"transit"}')
-[ "$CODE" = "400" ] && ok "已签收单追加节点被拦截" || bad "签收后竟可追加节点（HTTP $CODE）"
+[ "$CODE" = "400" ] && ok "已签收单追加节点被拦截" || bad "签收后竟可追加节点（HTTP ${CODE}）"
 # 轨迹 + 冷链温度联动
 TRACE=$(curl -s "$BASE/logistics/trace?logistics_no=$LO_NO" -H "$AUTH")
 NODE_N=$(jqget "$TRACE" "len(d['data']['nodes'])")
@@ -338,7 +338,7 @@ BK_FILE=$(jqget "$BK" "d['data']['file_name']")
 [ -n "$BK_FILE" ] && ok "手动备份: $BK_FILE" || bad "备份失败: $BK"
 BKL=$(curl -s "$BASE/backup" -H "$AUTH")
 BK_ID=$(jqget "$BKL" "d['data']['list'][0]['id']")
-[ -n "$BK_ID" ] && ok "备份清单（id=$BK_ID）" || bad "备份清单为空"
+[ -n "$BK_ID" ] && ok "备份清单（id=${BK_ID}）" || bad "备份清单为空"
 curl -s -o /tmp/e2e-backup.db "$BASE/backup/$BK_ID/download" -H "$AUTH" && head -c 6 /tmp/e2e-backup.db | grep -q 'SQLite' && ok "备份下载（合法 SQLite 文件）" || bad "备份下载非法"
 curl -s -X DELETE "$BASE/backup/$BK_ID" -H "$AUTH" | grep -q '已删除' && ok "备份删除" || bad "备份删除失败"
 rm -rf data/backup 2>/dev/null

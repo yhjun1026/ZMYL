@@ -132,6 +132,7 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { menuItems, moduleResource } from '../router'
 import { crud, workflow } from '../api'
+import { fieldLabel } from '../utils/fieldLabels'
 
 const route = useRoute()
 const title = ref('')
@@ -203,9 +204,10 @@ function deriveColumns(items) {
   if (!items.length) return []
   const skip = ['deleted', 'created_by', 'updated_by', 'password', 'password_hash']
   const keys = Object.keys(items[0]).filter(k => !skip.includes(k))
+  // 列名/表单标签一律用原版中文（字典未命中回退原字段名）
   return keys.slice(0, 9).map(k => ({
     key: k,
-    label: k,
+    label: fieldLabel(k),
     tag: /status|state|workflow/.test(k),
     type: /date|time|expiry|valid/.test(k) ? 'date' : /qty|count|amount|price|num/.test(k) ? 'number' : 'text',
   }))

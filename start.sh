@@ -8,6 +8,7 @@
 #   ./start.sh --dev        开发模式：API :8888 + Vite :5175（前后端热重载，Ctrl+C 一起退出）
 #   ./start.sh --build-only 只构建前端，不启动服务
 #   PORT=9000 ./start.sh    自定义端口
+#   BASE_PATH=/yl/ ./start.sh --rebuild   子路径部署构建（配合 nginx location /yl/ 转发）
 #
 # 访问入口：http://localhost:8888（前端 + API 同端口，单进程）
 # ============================================================

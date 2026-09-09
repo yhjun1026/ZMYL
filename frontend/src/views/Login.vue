@@ -12,8 +12,10 @@
   <div class="login-box">
     <div class="header">
       <div class="logo-icon">🏥</div>
-      <h1>医疗器械智能管理平台</h1>
-      <p class="subtitle">Zhuomeng Medical Device Intelligent Management Platform - GSP合规</p>
+      <div class="title-wrap">
+        <h1>医疗器械智能管理平台</h1>
+        <p class="subtitle">GSP合规 · 医疗器械经营质量管理规范</p>
+      </div>
     </div>
 
     <form autocomplete="on" @submit.prevent="doLogin">
@@ -57,9 +59,10 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { auth } from '../api'
+import { useAuthStore } from '../stores/auth'
 
 const router = useRouter()
+const authStore = useAuthStore()
 const username = ref('')
 const password = ref('')
 const showPwd = ref(false)
@@ -69,7 +72,7 @@ const errorMsg = ref('')
 const successMsg = ref('')
 
 const demoUsers = [
-  { name: 'admin', pwd: 'admin123', title: '系统管理员' },
+  { name: 'admin', pwd: '123456', title: '系统管理员' },
 ]
 
 function fillForm(u, p) {
@@ -82,11 +85,10 @@ async function doLogin() {
   successMsg.value = ''
   loading.value = true
   try {
-    const data = await auth.login(username.value, password.value)
-    const token = (data && data.token) || ''
-    if (token) localStorage.setItem('zmyl_token', token)
-    if (data && (data.username || data.name)) localStorage.setItem('zmyl_user_name', data.username || data.name)
-    else localStorage.setItem('zmyl_user_name', username.value)
+    const data = await authStore.login(username.value, password.value)
+    // 兼容 MainLayout 顶栏显示（zmyl_user_name）
+    const displayName = data.username || data.name || username.value
+    localStorage.setItem('zmyl_user_name', displayName)
     successMsg.value = '登录成功，正在进入系统...'
     await router.push('/dashboard')
   } catch (e) {
@@ -118,10 +120,12 @@ async function doLogin() {
   position: relative; z-index: 1; background: #fff; border-radius: 16px; padding: 44px 40px 36px;
   width: 420px; box-shadow: 0 24px 80px rgba(0,0,0,0.35);
 }
-.login-box .header { text-align: center; margin-bottom: 32px; }
-.login-box .logo-icon { font-size: 48px; margin-bottom: 8px; }
-.login-box h1 { font-size: 22px; color: #1a2332; margin-bottom: 6px; }
-.login-box .subtitle { color: #95a5b8; font-size: 13px; }
+/* 覆盖全局 legacy.css 的 .header（高度/阴影/两端分布），恢复原版登录头布局 */
+.login-box .header { display: flex; align-items: center; justify-content: center; gap: 14px; margin-bottom: 32px; height: auto; padding: 0; background: none; border: none; box-shadow: none; flex-shrink: 1; }
+.login-box .logo-icon { font-size: 44px; line-height: 1; flex-shrink: 0; }
+.login-box .title-wrap { flex: 1; min-width: 0; text-align: left; }
+.login-box h1 { font-size: 21px; color: #1a2332; margin-bottom: 4px; white-space: nowrap; }
+.login-box .subtitle { color: #95a5b8; font-size: 12px; white-space: nowrap; }
 .form-group { margin-bottom: 20px; }
 .form-group label { display: block; font-size: 13px; color: #2c3e50; margin-bottom: 6px; font-weight: 500; }
 .input-wrap { position: relative; }

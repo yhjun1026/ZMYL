@@ -8,6 +8,8 @@ import FlowConfig from '../views/FlowConfig.vue'
 import ColdChain from '../views/ColdChain.vue'
 import Logistics from '../views/Logistics.vue'
 import Backup from '../views/Backup.vue'
+import Permission from '../views/Permission.vue'
+import Settings from '../views/Settings.vue'
 
 // 原版菜单一比一还原（menu.js 的 menuItems）
 export const menuItems = [
@@ -81,7 +83,7 @@ export const moduleResource = {
   'cert-expiry': 'cert_update_request',
   'finance': 'finance_record',
   'ops-flow': 'knowledge_base',
-  'permission': 'user',
+  // 注：permission / settings 为独立页面（Permission.vue / Settings.vue），不走通用 CRUD
 }
 
 const routes = [
@@ -97,13 +99,15 @@ const routes = [
       { path: 'cold-chain', component: ColdChain, meta: { title: '冷链全程监控' } },
       { path: 'logistics', component: Logistics, meta: { title: '物流进度追踪' } },
       { path: 'backup', component: Backup, meta: { title: '数据备份与联动' } },
+      { path: 'permission', component: Permission, meta: { title: '角色权限管理' } },
+      { path: 'settings', component: Settings, meta: { title: '系统参数设置' } },
       { path: 'module/:id', component: ModulePage },
     ]
   },
   { path: '/:pathMatch(.*)*', redirect: '/dashboard' }
 ]
 
-const router = createRouter({ history: createWebHistory(), routes })
+const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 
 router.beforeEach((to) => {
   // token key 对齐到 zmyl_token（后端响应 + stores/auth.js）
