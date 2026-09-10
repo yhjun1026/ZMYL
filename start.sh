@@ -10,6 +10,10 @@
 #   PORT=9000 ./start.sh    自定义端口
 #   BASE_PATH=/yl/ ./start.sh --rebuild   子路径部署构建（配合 nginx location /yl/ 转发）
 #
+# 服务器（免打包）部署：dist 已提交进仓库，git pull 拿到最新前端，直接用：
+#   git pull && SKIP_BUILD=1 ./start.sh
+#   （SKIP_BUILD=1 = 完全跳过前端构建，也不装前端依赖，服务器无需 node_modules/网络）
+#
 # 访问入口：http://localhost:8888（前端 + API 同端口，单进程）
 # ============================================================
 set -euo pipefail
@@ -46,7 +50,7 @@ if [ ! -d "$ROOT/server/node_modules" ]; then
   echo "→ 安装后端依赖（better-sqlite3 需 python3+make+g++ 原生编译）..."
   (cd "$ROOT/server" && npm install --no-audit --no-fund)
 fi
-if [ ! -d "$ROOT/frontend/node_modules" ]; then
+if [ "$SKIP_BUILD" != "1" ] && [ ! -d "$ROOT/frontend/node_modules" ]; then
   echo "→ 安装前端依赖..."
   (cd "$ROOT/frontend" && npm install --no-audit --no-fund)
 fi
@@ -63,9 +67,11 @@ if [ "$DEV" = "1" ]; then
   exit 0
 fi
 
-# ---- 3. 构建前端（dist 缺失、--rebuild、或源码比 dist 新时）----
+# ---- 3. 构建前端（默认跳过：dist 已提交进仓库；仅在需要时构建）----
 NEED_BUILD=0
-if [ ! -f "$ROOT/frontend/dist/index.html" ] || [ "$REBUILD" = "1" ]; then
+if [ "$SKIP_BUILD" = "1" ]; then
+  echo "→ SKIP_BUILD=1：跳过前端构建，直接使用仓库里的 frontend/dist"
+elif [ ! -f "$ROOT/frontend/dist/index.html" ] || [ "$REBUILD" = "1" ]; then
   NEED_BUILD=1
 elif [ -n "$(find "$ROOT/frontend/src" "$ROOT/frontend/index.html" "$ROOT/frontend/vite.config.js" -newer "$ROOT/frontend/dist/index.html" -print -quit 2>/dev/null)" ]; then
   NEED_BUILD=1

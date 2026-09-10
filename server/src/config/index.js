@@ -13,6 +13,13 @@ const config = {
     dist: process.env.FRONTEND_DIST
       ? path.resolve(process.env.FRONTEND_DIST)
       : path.resolve(__dirname, '..', '..', '..', 'frontend', 'dist'),
+    // 前端构建时的 base 前缀（与 vite BASE_PATH 一致，如 /yl/）。
+    // 配了之后 Express 在该前缀下也挂载静态资源，直访 :8888/yl/ 同样正常（nginx 去前缀转发也不受影响）
+    basePath: (() => {
+      const b = (process.env.BASE_PATH || '').trim();
+      if (!b || b === '/') return '';
+      return ('/' + b.replace(/^\/+|\/+$/g, '')).replace(/\/$/, '');
+    })(),
   },
 
   db: {

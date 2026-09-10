@@ -20,6 +20,10 @@ dist/
 build/
 *.egg
 
+# 前端构建产物例外：见下方「Build artifacts」说明（服务器免打包部署）
+!frontend/dist/
+!frontend/dist/**
+
 # ===== Node / Vue =====
 node_modules/
 .npm
@@ -62,7 +66,9 @@ server/.env
 .workbuddy/
 
 # ===== Build artifacts =====
-frontend/dist/
+# 前端构建产物（frontend/dist）**提交进仓库**：服务器 git pull 即可更新前端，无需装依赖/打包
+# 注意：dist 是带 base 前缀构建的（当前 /yl/），换部署路径需本地重新构建后提交：
+#   BASE_PATH=/新的路径/ npm run build && git add frontend/dist
 *.tsbuildinfo
 
 # ===== Server runtime =====

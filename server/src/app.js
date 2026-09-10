@@ -83,6 +83,16 @@ function buildApp() {
         if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
       },
     }));
+    // 子路径部署（BASE_PATH=/yl/）：同一份产物也挂在前缀下，直访 :8888/yl/ 不会 404
+    if (config.frontend.basePath) {
+      app.use(config.frontend.basePath, express.static(config.frontend.dist, {
+        maxAge: '7d',
+        index: false,
+        setHeaders: (res, p) => {
+          if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+        },
+      }));
+    }
     // SPA 回退：非 /api /uploads 的 GET 一律返回 index.html（交给 vue-router）
     app.get(/^\/(?!api(?:\/|$)|uploads(?:\/|$)).*/, (req, res) => {
       res.setHeader('Cache-Control', 'no-cache');
