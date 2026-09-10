@@ -75,9 +75,17 @@ function buildApp() {
   // 9. 前端静态托管（一键模式：frontend/dist 存在时由本进程直接托管，前后端同端口）
   if (fs.existsSync(config.frontend.dist)) {
     logger.info(`[startup] 前端构建产物已挂载：${config.frontend.dist}`);
-    app.use(express.static(config.frontend.dist, { maxAge: '7d', index: false }));
+    app.use(express.static(config.frontend.dist, {
+      maxAge: '7d',
+      index: false,
+      // index.html 禁缓存：否则发新版后浏览器仍加载旧 bundle，页面"改不动"
+      setHeaders: (res, p) => {
+        if (p.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+      },
+    }));
     // SPA 回退：非 /api /uploads 的 GET 一律返回 index.html（交给 vue-router）
     app.get(/^\/(?!api(?:\/|$)|uploads(?:\/|$)).*/, (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache');
       res.sendFile(path.join(config.frontend.dist, 'index.html'));
     });
   } else if (config.isProd) {

@@ -63,8 +63,15 @@ if [ "$DEV" = "1" ]; then
   exit 0
 fi
 
-# ---- 3. 构建前端（dist 缺失或 --rebuild 时）----
+# ---- 3. 构建前端（dist 缺失、--rebuild、或源码比 dist 新时）----
+NEED_BUILD=0
 if [ ! -f "$ROOT/frontend/dist/index.html" ] || [ "$REBUILD" = "1" ]; then
+  NEED_BUILD=1
+elif [ -n "$(find "$ROOT/frontend/src" "$ROOT/frontend/index.html" "$ROOT/frontend/vite.config.js" -newer "$ROOT/frontend/dist/index.html" -print -quit 2>/dev/null)" ]; then
+  NEED_BUILD=1
+  echo "→ 检测到前端源码比 dist 新，自动重新构建..."
+fi
+if [ "$NEED_BUILD" = "1" ]; then
   echo "→ 构建前端..."
   (cd "$ROOT/frontend" && npm run build)
 fi
