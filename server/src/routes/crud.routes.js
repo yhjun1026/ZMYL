@@ -37,6 +37,7 @@ router.get('/product_acceptance/expiry-stats', asyncHandler(pa.paExpiryStats));
 
 // 验收资料 PDF 上传/下载（multer multipart）
 router.post('/acceptance_doc', fileCtl.upload.single('file'), asyncHandler(fileCtl.uploadDoc));
+router.get('/acceptance_doc', asyncHandler(fileCtl.listDocs)); // 按 biz_type/biz_id 过滤（先于通用 CRUD）
 router.get('/acceptance_doc/:id(\\d+)/file', asyncHandler(fileCtl.downloadDoc));
 router.delete('/acceptance_doc/:id(\\d+)', asyncHandler(fileCtl.removeDoc));
 

@@ -32,22 +32,27 @@ function buildApp() {
     stream: { write: (msg) => logger.info(msg.trim()) },
   }));
 
-  // 4. CORS
-  app.use(cors({
-    origin: (origin, cb) => {
-      // 同源 / 无 origin（curl 等）放行
-      if (!origin) return cb(null, true);
-      if (config.cors.origins.includes(origin) || config.cors.origins.includes('*')) {
-        return cb(null, true);
-      }
-      // 本机任意端口放行（vite build 产物为 crossorigin module script，
-      // 同源请求也会带 Origin 头，端口不固定：8888 生产 / 5173 dev / 自定义端口）
-      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-        return cb(null, true);
-      }
-      return cb(new Error(`CORS blocked: ${origin}`));
-    },
-    credentials: true,
+  // 4. CORS（函数式：可拿到 req，支持同源判定）
+  app.use(cors((req, cb) => {
+    const origin = req.headers.origin || '';
+    // 同源 / 无 origin（curl 等）放行
+    if (!origin) return cb(null, { origin: true, credentials: true });
+    if (config.cors.origins.includes(origin) || config.cors.origins.includes('*')) {
+      return cb(null, { origin: true, credentials: true });
+    }
+    // 本机任意端口放行（vite build 产物为 crossorigin module script，
+    // 同源请求也会带 Origin 头，端口不固定：8888 生产 / 5173 dev / 自定义端口）
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+      return cb(null, { origin: true, credentials: true });
+    }
+    // 同源放行：Origin 的主机名与请求 Host 一致（服务器 IP / 域名直访、nginx 同域反代）
+    try {
+      const originHost = new URL(origin).hostname;
+      const requestHost = (req.headers.host || '').replace(/:\d+$/, '');
+      if (originHost && originHost === requestHost) return cb(null, { origin: true, credentials: true });
+    } catch (_) { /* origin 解析失败走下方拦截 */ }
+    // 服务器部署额外放行：CORS_ORIGINS 里配置的 IP / 域名
+    return cb(new Error(`CORS blocked: ${origin}（如为合法来源，请在 server/.env 的 CORS_ORIGINS 中配置）`));
   }));
 
   // 5. 安全头

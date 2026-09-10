@@ -11,7 +11,7 @@ const config = require('../config');
 const { success, fail } = require('../utils/response');
 const auditLog = require('../utils/audit');
 
-const UPLOAD_ROLES = ['sys_admin', 'purchaser', 'quality_staff', 'quality_mgr', 'warehouse'];
+const UPLOAD_ROLES = ['sys_admin', 'purchaser', 'quality_staff', 'quality_mgr', 'warehouse', 'admin_dept'];
 const MAX_PDF_MB = 20;
 
 const ACCEPT_DIR = path.join(config.upload.dir, 'acceptance');

@@ -7,6 +7,7 @@
           <input class="search-input" v-model="keyword" :placeholder="'搜索' + title + '...'" @keyup.enter="reload">
           <button class="btn btn-primary" @click="reload">🔍 查询</button>
           <div class="spacer"></div>
+          <button v-if="resource === 'outbound_record'" class="btn btn-outline" @click="showPrintSettings">⚙ 打印设置</button>
           <button class="btn btn-primary" v-if="resource" @click="openCreate">＋ 新增</button>
         </div>
       </div>
@@ -39,6 +40,10 @@
               <!-- 操作列 -->
               <td v-if="resource" class="action-cell">
                 <button class="btn btn-sm btn-outline" @click="openEdit(row)">编辑</button>
+                <!-- 资料上传下载（首营/供货/验收/采购单） -->
+                <button v-if="DOC_RESOURCES.includes(resource)" class="btn btn-sm btn-outline" @click="openDocs(row)">📎 资料</button>
+                <!-- 出库单打印 -->
+                <button v-if="resource === 'outbound_record'" class="btn btn-sm btn-outline" @click="printOutbound(row)">🖨 打印</button>
                 <!-- 两级审批操作 -->
                 <template v-if="wf.mode === 'two' && row.workflow_status === '待审核'">
                   <button class="btn btn-sm btn-teal" @click="doReview(row, 'approve')">通过</button>
@@ -123,6 +128,12 @@
         </div>
       </div>
     </div>
+
+    <!-- 出库单专用联动表单 -->
+    <OutboundModal v-if="showOutbound" :edit-row="outboundEditRow" @close="showOutbound = false" @saved="reload" />
+
+    <!-- 资料上传下载 -->
+    <DocModal v-if="docTarget" :biz-type="docTarget.bizType" :biz-id="docTarget.bizId" :title="docTarget.title" @close="docTarget = null" />
   </div>
   <div v-else class="loading-text"><div class="loading-spinner"></div><div class="loading-label">模块开发中</div></div>
 </template>
@@ -132,6 +143,8 @@ import { ref, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { menuItems, moduleResource } from '../router'
 import { crud, workflow } from '../api'
+import OutboundModal from '../components/OutboundModal.vue'
+import DocModal from '../components/DocModal.vue'
 import { fieldLabel } from '../utils/fieldLabels'
 
 const route = useRoute()
@@ -149,6 +162,12 @@ const form = ref({})
 const editId = ref(null)
 const saving = ref(false)
 const wf = ref({ mode: '' })
+// 出库单专用表单 / 资料弹窗
+const showOutbound = ref(false)
+const outboundEditRow = ref(null)
+const docTarget = ref(null)
+// 支持资料上传下载的业务模块（首营/供货/验收/采购单）
+const DOC_RESOURCES = ['first_factory_audit', 'first_product_audit', 'supplier', 'product_acceptance', 'proc_equipment', 'proc_consumable']
 
 // 工作流模式配置（与后端 config/modules.js WORKFLOW 对齐）
 const WF_TWO = ['supplier', 'customer_archive', 'personnel', 'health_record',
@@ -214,14 +233,109 @@ function deriveColumns(items) {
 }
 
 function openCreate() {
+  if (resource.value === 'outbound_record') { outboundEditRow.value = null; showOutbound.value = true; return }
   editId.value = null
   form.value = {}
   showModal.value = true
 }
 function openEdit(row) {
+  if (resource.value === 'outbound_record') { outboundEditRow.value = row; showOutbound.value = true; return }
   editId.value = row.id
   form.value = { ...row }
   showModal.value = true
+}
+function openDocs(row) {
+  docTarget.value = { bizType: resource.value, bizId: row.id, title: (row.order_no || row.name || row.product_name || ('#' + row.id)) + ' · ' + title.value }
+}
+
+// ===== 出库单打印（原版打印系统移植：设置存 localStorage，iframe 打印） =====
+const PRINT_CFG_KEY = 'med_print_config'
+function getPrintConfig() {
+  try { return Object.assign({
+    companyName: '医疗器械有限公司', companyAddr: '北京市朝阳区科技园路88号', companyPhone: '010-88888000',
+    style: 'classic', paperSize: 'A4', fontSize: '13px', showGSPNote: true,
+  }, JSON.parse(localStorage.getItem(PRINT_CFG_KEY) || '{}')) } catch { return {
+    companyName: '医疗器械有限公司', companyAddr: '北京市朝阳区科技园路88号', companyPhone: '010-88888000',
+    style: 'classic', paperSize: 'A4', fontSize: '13px', showGSPNote: true,
+  } }
+}
+function showPrintSettings() {
+  const cfg = getPrintConfig()
+  const html = `
+    <div style="padding:16px 20px">
+      <div class="form-row"><div class="form-group"><label>公司名称</label><input id="ps_company" value="${cfg.companyName}"></div>
+      <div class="form-group"><label>联系电话</label><input id="ps_phone" value="${cfg.companyPhone}"></div></div>
+      <div class="form-row"><div class="form-group"><label>公司地址</label><input id="ps_addr" value="${cfg.companyAddr}"></div>
+      <div class="form-group"><label>打印样式</label><select id="ps_style" style="width:100%;padding:9px;border:1px solid #e4e8ee;border-radius:8px">
+        <option value="classic"${cfg.style === 'classic' ? ' selected' : ''}>经典标准样式</option>
+        <option value="detailed"${cfg.style === 'detailed' ? ' selected' : ''}>详细合规样式</option></select></div></div>
+      <div class="form-row"><div class="form-group"><label>纸张大小</label><select id="ps_paper" style="width:100%;padding:9px;border:1px solid #e4e8ee;border-radius:8px">
+        <option value="A4"${cfg.paperSize === 'A4' ? ' selected' : ''}>A4</option>
+        <option value="A5"${cfg.paperSize === 'A5' ? ' selected' : ''}>A5</option></select></div>
+      <div class="form-group"><label>正文字号</label><select id="ps_fontsize" style="width:100%;padding:9px;border:1px solid #e4e8ee;border-radius:8px">
+        <option value="12px"${cfg.fontSize === '12px' ? ' selected' : ''}>小 (12px)</option>
+        <option value="13px"${cfg.fontSize === '13px' ? ' selected' : ''}>标准 (13px)</option>
+        <option value="14px"${cfg.fontSize === '14px' ? ' selected' : ''}>大 (14px)</option></select></div></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" id="ps_gsp"${cfg.showGSPNote ? ' checked' : ''}> 页脚显示GSP合规条款</label>
+    </div>`
+  const overlay = document.createElement('div')
+  overlay.className = 'modal-overlay show'
+  overlay.innerHTML = `<div class="modal" style="max-width:640px;width:92%"><div class="modal-header"><div class="modal-title">出库单打印设置</div><button class="modal-close">✕</button></div>${html}<div class="modal-footer"><button class="btn" style="background:#f0f2f5" id="ps_cancel">取消</button><button class="btn btn-primary" id="ps_save">保存</button></div></div>`
+  document.body.appendChild(overlay)
+  overlay.querySelector('.modal-close').onclick = overlay.querySelector('#ps_cancel').onclick = () => overlay.remove()
+  overlay.querySelector('#ps_save').onclick = () => {
+    const g = (id) => overlay.querySelector('#' + id)
+    localStorage.setItem(PRINT_CFG_KEY, JSON.stringify({
+      companyName: g('ps_company').value, companyAddr: g('ps_addr').value, companyPhone: g('ps_phone').value,
+      style: g('ps_style').value, paperSize: g('ps_paper').value, fontSize: g('ps_fontsize').value,
+      showGSPNote: g('ps_gsp').checked,
+    }))
+    overlay.remove()
+    window.alert('打印设置已保存')
+  }
+}
+function printOutbound(row) {
+  const cfg = getPrintConfig()
+  const detailed = cfg.style === 'detailed'
+  const th = (t) => `<td style="background:#f5f7fa;font-weight:600;width:110px;padding:6px 10px;border:1px solid #d8dee6">${t}</td>`
+  const td = (v) => `<td style="padding:6px 10px;border:1px solid #d8dee6">${v ?? '-'}</td>`
+  const rowsHtml = detailed ? [
+    ['出库单号', row.order_no, '日期', row.date], ['客户名称', row.customer, '客户许可证', row.customer_license],
+    ['设备名称', row.equip_name, 'UDI', row.equip_udi], ['批号', row.batch, '注册证号', row.reg_cert],
+    ['生产厂家', row.factory_name, '生产许可证号', row.prod_license_no],
+    ['数量', (row.qty ?? '-') + (row.unit || ''), '单价/总金额', `￥${row.price ?? 0} / ￥${row.total ?? 0}`],
+    ['生产日期', row.prod_date, '有效期至', row.expire_date],
+    ['制单人', row.operator, '收货人', row.recipient],
+    ['运输条件', row.transport_condition, '储存条件', row.storage_condition],
+    ['出库状态', row.status, '备注', row.note],
+  ] : [
+    ['出库单号', row.order_no, '日期', row.date], ['客户名称', row.customer, '设备名称', row.equip_name],
+    ['批号', row.batch, '数量', (row.qty ?? '-') + (row.unit || '')],
+    ['总金额', `￥${row.total ?? 0}`, '出库状态', row.status], ['收货人', row.recipient, '制单人', row.operator],
+  ]
+  const bodyAll = []
+  for (let i = 0; i < rowsHtml.length; i += 2) {
+    const a = rowsHtml[i], b = rowsHtml[i + 1] || ['', '', '', '']
+    bodyAll.push(`<tr>${th(a[0])}${td(a[1])}${th(a[2])}${td(a[3])}${th(b[0])}${td(b[1])}${th(b[2])}${td(b[3])}</tr>`)
+  }
+  const gsp = cfg.showGSPNote ? '<p style="font-size:11px;color:#888;margin-top:14px;text-align:center">本单据依据《医疗器械经营质量管理规范》（GSP第59-67条）生成，出库须经质量复核确认。</p>' : ''
+  const w = window.open('', '_blank', 'width=900,height=680')
+  if (!w) { window.alert('浏览器拦截了打印窗口，请允许弹窗后重试'); return }
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>出库单 ${row.order_no || ''}</title>
+    <style>body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:#222;${cfg.paperSize === 'A5' ? 'width:148mm;' : 'width:210mm;'}margin:0 auto;padding:24px;font-size:${cfg.fontSize}}
+    h1{font-size:20px;text-align:center;margin:0 0 4px}.sub{text-align:center;color:#666;font-size:12px;margin-bottom:6px}
+    .co{text-align:center;font-size:15px;font-weight:600;margin-bottom:2px}
+    table{border-collapse:collapse;width:100%;margin-top:12px}
+    .sign{margin-top:36px;display:flex;justify-content:space-between;font-size:13px}
+    @media print{body{padding:0}}</style></head><body>
+    <div class="co">${cfg.companyName}</div><h1>销 售 出 库 单</h1>
+    <div class="sub">地址：${cfg.companyAddr}　电话：${cfg.companyPhone}</div>
+    <table>${bodyAll.join('')}</table>
+    <div class="sign"><span>发货人：__________</span><span>质量复核：__________</span><span>收货人签字：__________</span></div>
+    ${gsp}
+    <script>window.onload=function(){window.print()}<\/script>
+    </body></html>`)
+  w.document.close()
 }
 async function save() {
   saving.value = true

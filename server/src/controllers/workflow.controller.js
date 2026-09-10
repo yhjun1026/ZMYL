@@ -207,6 +207,19 @@ async function convertPlan(req, res) {
         isConsumable ? '耗材采购' : '设备采购', nowFull(),
       ]
     );
+    // 互联互通：转单后自动生成关联的采购入库验收单（五步流起点=待验收）
+    tx.run(
+      `INSERT INTO product_acceptance
+        (product_name, batch_no, manufacturer, prod_license_no, reg_cert_no,
+         supplier, quantity, accept_date, accept_person, check_type,
+         workflow_status, linked_proc_id, created_by, created_at, deleted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      [
+        plan.name || '', '', plan.factory_name || '', '', '',
+        plan.factory_name || '', plan.qty || 1, today, user, '采购入库验收',
+        '待验收', info.insertId, user, nowFull(),
+      ]
+    );
     tx.run(
       'UPDATE purchase_plan SET workflow_status = ?, status = ? WHERE id = ?',
       ['已转采购', '已转采购', plan.id]
@@ -219,7 +232,7 @@ async function convertPlan(req, res) {
 
   return res.json(success(
     { order_no: orderNo, id: created.insertId },
-    `已生成采购执行单 ${orderNo}`
+    `已生成采购执行单 ${orderNo}，并自动创建关联采购入库验收单`
   ));
 }
 
