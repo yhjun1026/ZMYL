@@ -3,16 +3,17 @@
 # ZMYL 卓盟医疗器械全生命周期管理平台 —— 一键启动脚本
 #
 # 用法：
-#   ./start.sh              生产模式：装依赖(如缺) → 构建前端 → 迁移 → 启动 :8888
-#   ./start.sh --rebuild    强制重新构建前端（前端代码更新后用）
+#   ./start.sh              生产模式（默认）：直接用仓库里的 dist → 迁移 → 启动 :8888（免打包）
+#   ./start.sh --rebuild    重新构建前端（改了前端代码时用，会装前端依赖）
 #   ./start.sh --dev        开发模式：API :8888 + Vite :5175（前后端热重载，Ctrl+C 一起退出）
 #   ./start.sh --build-only 只构建前端，不启动服务
 #   PORT=9000 ./start.sh    自定义端口
-#   BASE_PATH=/yl/ ./start.sh --rebuild   子路径部署构建（配合 nginx location /yl/ 转发）
+#   BASE_PATH=/yl/ ./start.sh --rebuild   子路径构建（配合 nginx location /yl/ 转发）
 #
-# 服务器（免打包）部署：dist 已提交进仓库，git pull 拿到最新前端，直接用：
-#   git pull && SKIP_BUILD=1 ./start.sh
-#   （SKIP_BUILD=1 = 完全跳过前端构建，也不装前端依赖，服务器无需 node_modules/网络）
+# 前端构建：默认跳过（dist 已提交进仓库，git pull 即更新，服务器无需 node_modules/网络）
+#   服务器部署：git pull && BASE_PATH=/yl/ ./start.sh
+#   需要打包：  ./start.sh --rebuild     （或 SKIP_BUILD=0 ./start.sh）
+#   强制免打包：SKIP_BUILD=1 ./start.sh
 #
 # 访问入口：http://localhost:8888（前端 + API 同端口，单进程）
 # ============================================================
@@ -22,15 +23,24 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 PORT="${PORT:-8888}"
 export PORT
 
+# 前端 base 路径：默认 /yl/（与 nginx location /yl/ 一致）
+#   根路径部署请显式指定：BASE_PATH=/ ./start.sh --rebuild
+export BASE_PATH="${BASE_PATH:-/yl/}"
+
+# 前端构建开关（默认 1 = 跳过构建）：dist 已提交进仓库，git pull 即用，服务器无需 node_modules/网络
+#   需要打包时：SKIP_BUILD=0 ./start.sh --rebuild   或   BASE_PATH=/yl/ ./start.sh --rebuild
+SKIP_BUILD="${SKIP_BUILD:-1}"
+
 DEV=0; REBUILD=0; BUILD_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --dev)        DEV=1 ;;
-    --rebuild)    REBUILD=1 ;;
-    --build-only) BUILD_ONLY=1 ;;
+    --rebuild)    REBUILD=1; SKIP_BUILD=0 ;;
+    --build-only) BUILD_ONLY=1; SKIP_BUILD=0 ;;
     *) echo "未知参数: $arg（支持 --dev / --rebuild / --build-only）"; exit 1 ;;
   esac
 done
+export SKIP_BUILD
 
 # ---- 0. 环境检查 ----
 command -v node >/dev/null 2>&1 || { echo "✗ 未找到 node，请先安装 Node.js >= 18"; exit 1; }
@@ -69,8 +79,8 @@ fi
 
 # ---- 3. 构建前端（默认跳过：dist 已提交进仓库；仅在需要时构建）----
 NEED_BUILD=0
-if [ "$SKIP_BUILD" = "1" ]; then
-  echo "→ SKIP_BUILD=1：跳过前端构建，直接使用仓库里的 frontend/dist"
+if [ "$SKIP_BUILD" = "1" ] && [ -f "$ROOT/frontend/dist/index.html" ]; then
+  echo "→ 免打包模式：直接使用仓库里的 frontend/dist（需构建请跑 ./start.sh --rebuild）"
 elif [ ! -f "$ROOT/frontend/dist/index.html" ] || [ "$REBUILD" = "1" ]; then
   NEED_BUILD=1
 elif [ -n "$(find "$ROOT/frontend/src" "$ROOT/frontend/index.html" "$ROOT/frontend/vite.config.js" -newer "$ROOT/frontend/dist/index.html" -print -quit 2>/dev/null)" ]; then
