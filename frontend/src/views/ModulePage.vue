@@ -25,6 +25,7 @@
             <tr v-for="row in rows" :key="row.id">
               <td v-for="col in columns" :key="col.key">
                 <span v-if="col.tag" class="tag" :class="tagClass(row[col.key])">{{ row[col.key] ?? '-' }}</span>
+                <span v-else-if="col.html" class="html-cell" title="点击查看内容" @click="previewHtml(row, col)">{{ plainText(row[col.key]) }}</span>
                 <template v-else>{{ fmt(row[col.key]) }}</template>
               </td>
               <!-- 审批状态列 -->
@@ -116,7 +117,8 @@
           <div class="form-row">
             <div class="form-group" v-for="col in editableColumns" :key="col.key">
               <label>{{ col.label }}<span v-if="col.required" style="color:var(--danger)"> *</span></label>
-              <input v-if="col.type !== 'date' && col.type !== 'number'" v-model="form[col.key]" :type="col.type || 'text'">
+              <textarea v-if="col.html" v-model="form[col.key]" rows="6" class="html-textarea"></textarea>
+              <input v-else-if="col.type !== 'date' && col.type !== 'number'" v-model="form[col.key]" :type="col.type || 'text'">
               <input v-else-if="col.type === 'date'" v-model="form[col.key]" type="date">
               <input v-else v-model.number="form[col.key]" type="number">
             </div>
@@ -134,6 +136,22 @@
 
     <!-- 资料上传下载 -->
     <DocModal v-if="docTarget" :biz-type="docTarget.bizType" :biz-id="docTarget.bizId" :title="docTarget.title" @close="docTarget = null" />
+
+    <!-- 富文本内容查看弹窗 -->
+    <div class="modal-overlay" :class="{ show: previewVisible }">
+      <div class="modal" style="max-width:760px;width:92%">
+        <div class="modal-header">
+          <div class="modal-title">{{ previewTitle }}</div>
+          <button class="modal-close" @click="previewVisible = false">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="rich-preview" v-html="previewContent"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-primary" @click="previewVisible = false">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div v-else class="loading-text"><div class="loading-spinner"></div><div class="loading-label">模块开发中</div></div>
 </template>
@@ -224,12 +242,32 @@ function deriveColumns(items) {
   const skip = ['deleted', 'created_by', 'updated_by', 'password', 'password_hash']
   const keys = Object.keys(items[0]).filter(k => !skip.includes(k))
   // 列名/表单标签一律用原版中文（字典未命中回退原字段名）
-  return keys.slice(0, 9).map(k => ({
-    key: k,
-    label: fieldLabel(k),
-    tag: /status|state|workflow/.test(k),
-    type: /date|time|expiry|valid/.test(k) ? 'date' : /qty|count|amount|price|num/.test(k) ? 'number' : 'text',
-  }))
+  return keys.slice(0, 9).map(k => {
+    const sample = items.find(it => it[k] !== null && it[k] !== undefined && it[k] !== '')
+    const isHtml = sample && typeof sample[k] === 'string' && /<\/?[a-z][^>]*>/i.test(sample[k])
+    return {
+      key: k,
+      label: fieldLabel(k),
+      tag: /status|state|workflow/.test(k),
+      html: isHtml,
+      type: /date|time|expiry|valid/.test(k) ? 'date' : /qty|count|amount|price|num/.test(k) ? 'number' : 'text',
+    }
+  })
+}
+
+// ===== 富文本字段：列表显示纯文本摘要，点击查看渲染内容 =====
+const previewVisible = ref(false)
+const previewTitle = ref('')
+const previewContent = ref('')
+function plainText(v) {
+  if (v === null || v === undefined || v === '') return '-'
+  const text = String(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim()
+  return text.length > 80 ? text.slice(0, 80) + '…' : text
+}
+function previewHtml(row, col) {
+  previewTitle.value = (row.title || row.name || '#' + row.id) + ' · ' + col.label
+  previewContent.value = row[col.key] || ''
+  previewVisible.value = true
 }
 
 function openCreate() {
@@ -468,3 +506,36 @@ watch(() => route.params.id, async (id) => {
   }
 }, { immediate: true })
 </script>
+
+<style scoped>
+/* 富文本字段：列表内显示纯文本摘要（最多2行），可点击查看 */
+.html-cell {
+  cursor: pointer;
+  color: #1677ff;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+  max-width: 260px;
+}
+.html-cell:hover { text-decoration: underline; }
+.html-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 9px 12px;
+  border: 1px solid #e4e8ee;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+/* 弹窗内富文本渲染样式 */
+.rich-preview { font-size: 13px; line-height: 1.8; color: #333; word-break: break-word; }
+.rich-preview :deep(h1), .rich-preview :deep(h2), .rich-preview :deep(h3) { font-size: 14px; font-weight: 600; margin: 12px 0 6px; color: #1f2329; }
+.rich-preview :deep(p) { margin: 6px 0; }
+.rich-preview :deep(ul), .rich-preview :deep(ol) { padding-left: 20px; margin: 6px 0; }
+.rich-preview :deep(table) { border-collapse: collapse; margin: 8px 0; }
+.rich-preview :deep(td), .rich-preview :deep(th) { border: 1px solid #d8dee6; padding: 6px 10px; }
+</style>
